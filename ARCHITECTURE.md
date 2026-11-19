@@ -59,6 +59,19 @@ Tiempos de paso: `GET …/poste-autobus/{id}.json` (p. ej. `tuzsa-104`)
 }
 ```
 
+#### Tiempos reales a través del Worker de Ododex (fuente principal)
+
+Como la API municipal de tiempos está caída, la fuente principal es la web pública del operador Avanza, `https://zaragoza-pasobus.avanzagrupo.com/frm_esquemaparadatime.php?poste={número}` (HTML en ISO-8859-1, sin CORS), con respaldo en `https://api.dndzgz.com/services/bus/{número}` (JSON `{"estimates":[{"line":"51","direction":"PABELLN PRNCIPE FELIPE.","estimate":3}]}`, sin CORS y sin tildes). El navegador no puede leer ninguna de las dos, así que el Worker `ododex-zaragoza-bus` de ododex-sitio (`workers/zaragoza-bus.mjs`) hace de proxy en `GET /es/zaragoza-bus/api/poste/{número}` y responde **con el mismo formato histórico del Ayuntamiento**, una fila por autobús:
+
+```json
+{ "origen": "avanza", "destinos": [
+  { "linea": "25", "destino": "LA CARTUJA", "primero": "14 minutos." },
+  { "linea": "23", "destino": "PARQUE VENECIA", "primero": "En la parada." }
+] }
+```
+
+Así el cliente reutiliza `parseArrivals` (que agrupa por línea y destino y toma los dos menores). Errores: `{ "error": "<mensaje en español>" }` con 400 (número inválido), 404, 405 o 502 (los dos orígenes fallaron). Ese Worker solo existe en producción y en `wrangler dev`; en `next dev` la ruta no existe y el cliente cae a la siguiente fuente.
+
 `data/stops-snapshot.json` es una captura real del listado completo (2026-11-19, mismo formato, coordenadas a 6 decimales). Se usa como listado demo.
 
 ## 2. Plataforma
@@ -188,7 +201,7 @@ export function describeFailure(error: unknown): string;
 
 - Cada petición con `AbortController` y `REQUEST_TIMEOUT_MS`.
 - `fetchStops`: pide `${STOP_LIST_URL}&rows=${STOP_LIST_PAGE_SIZE}&start=N` empezando en 0 y sumando `STOP_LIST_PAGE_SIZE` mientras la suma de `rawCount` sea menor que `totalCount` y la página no venga vacía (máximo 10 páginas). Une, quita duplicados. Si cualquier página falla (red, `!response.ok`, JSON inválido, `StopsFormatError`) o el resultado queda vacío → `{ data: demoStops(), source: 'demo', fallbackReason }`.
-- `fetchArrivals`: pide `arrivalsUrl(stop.id)`. Lee el cuerpo como JSON también cuando `!response.ok` (la API manda `status`/`mensaje`); si el cuerpo no es JSON, error con el código HTTP. Cualquier fallo → `{ data: demoArrivals(stop, now), source: 'demo', fallbackReason }`.
+- `fetchArrivals`: prueba las fuentes en orden y devuelve la primera que funcione: (1) el proxy del Worker, `arrivalsProxyUrl(stop.number)` de config (`/es/zaragoza-bus/api/poste/{número}`, ruta relativa al mismo origen); (2) la API municipal; (3) demo. Las dos primeras se tratan igual (cuerpo JSON leído también en `!ok`, `parseArrivals`). `fallbackReason` de la demo describe el fallo de la API municipal precedido de «Proxy: <motivo>. » si el proxy también falló. Detalle de la API municipal: pide `arrivalsUrl(stop.id)`. Lee el cuerpo como JSON también cuando `!response.ok` (la API manda `status`/`mensaje`); si el cuerpo no es JSON, error con el código HTTP. Cualquier fallo → `{ data: demoArrivals(stop, now), source: 'demo', fallbackReason }`.
 - `describeFailure`: mensaje en español: `TypeError` de fetch → «No se pudo conectar con la API (red o CORS bloqueado).»; aborto → «La API no respondió en 8 s.»; errores de formato → «La API devolvió un formato inesperado: …»; HTTP → «La API respondió con error HTTP <código>: <mensaje>.»; otro → su `message`.
 
 ### 3.10 `lib/line-route.ts` (types, config, bus-source)
@@ -263,6 +276,15 @@ Componentes (un fichero cada uno en `components/`):
 - Escritorio (≥ 1024 px): dos columnas. Izquierda 420 px con cabecera, buscador, chips y contenido (inicio, resultados o marquesina) con scroll propio; derecha el mapa a pantalla completa.
 - Móvil: una columna. Cabecera, buscador fijo arriba, chips, contenido. Botón «Mapa» / «Lista» en la cabecera alterna el mapa a pantalla completa bajo el buscador.
 - Contenido según estado: poste seleccionado → `StopBoard`; consulta o línea activas → `StopResultList` (o «Sin resultados»); si no → `HomePanel`.
+
+## 4b. Integración en ododex.com (`/es/zaragoza-bus`)
+
+Decisiones del titular (2026-11-19): paleta blanca y roja de ZaraBus (sin modo oscuro); cabecera y pie de Ododex con páginas legales; **sin anuncios** (ni `AdSlot` ni `AdSenseScript` ni botón de consentimiento); integrada con `publicada: false` hasta que se valide en producción.
+
+- `next.config.ts`: `basePath: '/es/zaragoza-bus'`. `lib/site.ts` con `SITE_NAME`, `SECTION_NAME = 'Autobús de Zaragoza'`, `BASE_PATH`, `getSiteUrl()`, `absoluteUrl()`, `assetPath()` (copiado de `../es-itv`). Recursos fuera de `next/link` con `assetPath()`.
+- Maquetación: cabecera Ododex (logo claro de Ododex + «Autobús de Zaragoza», sin botón de tema) arriba; debajo la app ocupa el alto visible restante (`calc(100dvh - alto de cabecera)`), con su barra propia (buscador, insignia En vivo/Demo, botón Mapa) y el mapa; al hacer scroll, un bloque de texto breve «Sobre este servicio» (fuentes, carácter independiente, tiempos estimados) y el pie Ododex (descripción, atribución OSM y fuentes, enlaces legales, «Otras webs de Ododex»).
+- Páginas: `/aviso-legal`, `/privacidad`, `/cookies` (noindex, follow; datos del titular con `lib/legal.ts` y `config/titular.json`, que no va a git), `not-found.tsx` con cabecera y pie, `app/sitemap.ts` (`force-static`, solo la portada). Canonical y OpenGraph con `absoluteUrl`.
+- Pruebas copiadas y adaptadas de es-itv: site, legal, legal-pages, network, no-template-leftovers; sin las de AdSlot. Colores: tokens propios en `globals.css` (rojo), nunca hex sueltos en `.tsx`.
 
 ## 5. Criterios de aceptación
 
