@@ -10,7 +10,8 @@ Hace:
 - Filtro rápido por línea (chips: 21, 24, 33, Ci1…), combinable con la búsqueda.
 - Vista de poste estilo marquesina: número en insignia roja, nombre, estrella de favorito y lista de líneas con destino, primer bus en grande y segundo en gris.
 - Refresco manual y automático cada 30 s (se pausa con la pestaña oculta y refresca al volver).
-- Mapa claro (CartoDB Positron) con puntos rojos por poste y agrupación (clustering) al alejar. Pulsar un punto abre ese poste.
+- Mapa OpenStreetMap estándar (las teselas Positron de CARTO exigen clave de API desde 2026 y se descartaron) con puntos rojos por poste y agrupación (clustering) al alejar. Pulsar un punto abre ese poste.
+- Recorrido de una línea dibujado en el mapa (trazado oficial de 2013) al filtrar por esa línea o al pulsar su insignia en la marquesina. No hay posiciones GPS de autobuses: el Ayuntamiento no las publica.
 - Pantalla inicial con «Mis paradas» (favoritos en `localStorage`) y botón «Buscar paradas cerca de mí» (geolocalización).
 - Indicador «En vivo» / «Demo» en la cabecera. Si la API falla (CORS, red, error del servidor, formato inesperado) se usan datos simulados y se muestra «Demo» con el motivo en el `title`.
 
@@ -190,6 +191,36 @@ export function describeFailure(error: unknown): string;
 - `fetchArrivals`: pide `arrivalsUrl(stop.id)`. Lee el cuerpo como JSON también cuando `!response.ok` (la API manda `status`/`mensaje`); si el cuerpo no es JSON, error con el código HTTP. Cualquier fallo → `{ data: demoArrivals(stop, now), source: 'demo', fallbackReason }`.
 - `describeFailure`: mensaje en español: `TypeError` de fetch → «No se pudo conectar con la API (red o CORS bloqueado).»; aborto → «La API no respondió en 8 s.»; errores de formato → «La API devolvió un formato inesperado: …»; HTTP → «La API respondió con error HTTP <código>: <mensaje>.»; otro → su `message`.
 
+### 3.10 `lib/line-route.ts` (types, config, bus-source)
+
+Responsabilidad: obtener y analizar el trazado oficial de una línea para dibujarlo en el mapa.
+
+Fuente (comprobado el 2026-11-19): `GET …/transporte-urbano/linea-autobus/{línea}.json?srsname=wgs84` (`lineRouteUrl` en config). `200` con `Access-Control-Allow-Origin: *`. Datos de 2013 (`lastUpdated`), así que puede haber líneas sin trazado o con recorridos antiguos. Formato:
+
+```json
+{
+  "title": "Transporte Urbano. Línea 24",
+  "lastUpdated": "2013-10-14T08:40:00",
+  "result": [
+    { "geometry": { "type": "MultiLineString", "coordinates": [[[-0.8602, 41.6509], [-0.8601, 41.6509]]] } },
+    { "geometry": { "type": "MultiLineString", "coordinates": [[[-0.8710, 41.6400], [-0.8705, 41.6402]]] } },
+    { "title": "Parada P. Echegaray Y Caballero / S. Minguijón", "description": "Poste 651", "geometry": { "type": "Point", "coordinates": [-0.86, 41.65] } }
+  ]
+}
+```
+
+Los elementos `MultiLineString` (normalmente dos, uno por sentido) son el recorrido; los `Point` son postes y se ignoran. Coordenadas `[longitud, latitud]`.
+
+```ts
+export class RouteFormatError extends Error {}
+export interface LineRoute { line: string; paths: Coordinates[][]; }
+export function parseLineRoute(line: string, json: unknown): LineRoute;
+export async function fetchLineRoute(line: string, fetchFn: FetchFunction): Promise<LineRoute>;
+```
+
+- `parseLineRoute`: lanza `RouteFormatError` si `json` no es objeto, si `result` no es array o si no queda ningún tramo. Acepta geometrías `LineString` (un tramo) y `MultiLineString` (varios). Descarta puntos con coordenadas no numéricas finitas y tramos con menos de 2 puntos.
+- `fetchLineRoute`: pide `lineRouteUrl(line)` con el mismo tiempo máximo (`REQUEST_TIMEOUT_MS`) y lanza ante cualquier fallo (red, HTTP no ok, JSON inválido, formato). El mensaje para el usuario se obtiene con `describeFailure` de bus-source, que debe clasificar `RouteFormatError` como formato inesperado. Sin datos demo: si falla, el mapa simplemente no dibuja el trazado. Reutiliza el helper de petición con timeout de bus-source si se exporta sin romper su interfaz; si no, uno propio equivalente.
+
 ### 3.9 Interfaz (`lib/use-*.ts`, `components/`, `app/`) (todo lo anterior)
 
 Hooks:
@@ -222,7 +253,8 @@ Componentes (un fichero cada uno en `components/`):
 - `StopBoard` — marquesina: cabecera con botón volver, insignia roja grande con el número, nombre, estrella (`Star`, rellena en rojo si favorito), botón refrescar (`RefreshCw`, gira mientras carga) y «Actualizado hh:mm:ss». Lista de `ArrivalRow`. Estados: cargando (esqueleto), sin líneas («Este poste no tiene estimaciones ahora mismo»).
 - `ArrivalRow` — insignia roja con línea, destino, primero grande en rojo (`Llegando` si 0, `N min`, `—` si null) con `tabular-nums`, segundo en gris pequeño.
 - `HomePanel` — «Mis paradas» (lista de favoritos o texto de ayuda) y «Cerca de mí» (botón `LocateFixed` «Buscar paradas cerca de mí», estados de geolocalización con mensajes, lista con distancias).
-- `BusMap` + `BusMapLoader` — Leaflet cargado solo en cliente (`next/dynamic` con `ssr: false`). Teselas Positron, `L.markerClusterGroup` con `circleMarker` rojo (`#DC2626`, radio 6, borde blanco), clusters con estilo propio rojo/blanco (CSS en `globals.css`). Pulsar un punto → seleccionar poste. Al seleccionar un poste, centra en él con `MAP_SELECTED_ZOOM` y lo resalta (radio mayor). Si hay posición del usuario, punto azul.
+- `BusMap` + `BusMapLoader` — Leaflet cargado solo en cliente (`next/dynamic` con `ssr: false`). Teselas estándar de OpenStreetMap (`MAP_TILE_URL`), `L.markerClusterGroup` con `circleMarker` rojo (`#DC2626`, radio 6, borde blanco), clusters con estilo propio rojo/blanco (CSS en `globals.css`). Pulsar un punto → seleccionar poste. Al seleccionar un poste, centra en él con `MAP_SELECTED_ZOOM` y lo resalta (radio mayor). Si hay posición del usuario, punto azul.
+- Trazado de línea (§3.10): la línea a dibujar es la del filtro activo o, si no hay filtro, la que el usuario pulse en una fila de la marquesina (la insignia de línea de `ArrivalRow` es un botón «Ver recorrido en el mapa»; pulsarla otra vez lo quita). Hook `useLineRoute(line: string | null): { route: LineRoute | null; loading: boolean; error?: string }` con caché en memoria por línea e ignorando respuestas de una línea ya no activa. `BusMap` recibe `route` y la dibuja como polilínea roja (`#DC2626`, grosor 4, opacidad 0.75) en un panel por debajo de los postes, y ajusta la vista al trazado (`fitBounds` con margen) salvo si hay un poste seleccionado. Si falla, aviso discreto en el panel izquierdo («No se pudo cargar el recorrido de la línea N: motivo»). En móvil, activar un recorrido no abre el mapa por sí solo.
 
 ## 4. Diseño gráfico
 

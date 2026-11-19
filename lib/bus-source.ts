@@ -1,7 +1,8 @@
 import type { Arrival, BusStop, SourcedResult } from './types';
 import { REQUEST_TIMEOUT_MS, STOP_LIST_PAGE_SIZE, STOP_LIST_URL, arrivalsUrl } from './config';
-import { StopsFormatError, parseStopListPage } from './stops-parser';
-import { ArrivalsFormatError, parseArrivals } from './arrivals-parser';
+import { FormatError } from './format-error';
+import { parseStopListPage } from './stops-parser';
+import { parseArrivals } from './arrivals-parser';
 import { demoArrivals, demoStops } from './demo-data';
 
 export type FetchFunction = (url: string, init?: RequestInit) => Promise<Response>;
@@ -23,7 +24,7 @@ class HttpStatusError extends Error {
 }
 
 /** Respuesta correcta (200) cuyo cuerpo no se puede interpretar, por ejemplo porque no es JSON. */
-class ResponseFormatError extends Error {}
+class ResponseFormatError extends FormatError {}
 
 function isAbortError(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as { name?: unknown }).name === 'AbortError';
@@ -33,11 +34,7 @@ function isAbortError(error: unknown): boolean {
 export function describeFailure(error: unknown): string {
   if (isAbortError(error)) return `La API no respondió en ${REQUEST_TIMEOUT_MS / MS_PER_SECOND} s.`;
   if (error instanceof TypeError) return 'No se pudo conectar con la API (red o CORS bloqueado).';
-  if (
-    error instanceof StopsFormatError ||
-    error instanceof ArrivalsFormatError ||
-    error instanceof ResponseFormatError
-  ) {
+  if (error instanceof FormatError) {
     return `La API devolvió un formato inesperado: ${error.message}`;
   }
   if (error instanceof HttpStatusError) {
@@ -65,7 +62,7 @@ async function readJsonBody(response: Response): Promise<unknown> {
 }
 
 /** Pide una URL con tiempo límite y devuelve el JSON; el temporizador se limpia siempre. */
-async function requestJson(fetchFn: FetchFunction, url: string): Promise<unknown> {
+export async function requestJson(fetchFn: FetchFunction, url: string): Promise<unknown> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {

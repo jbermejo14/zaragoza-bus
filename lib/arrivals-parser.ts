@@ -1,7 +1,8 @@
+import { FormatError } from './format-error';
 import type { Arrival } from './types';
 
 /** Error de formato en la respuesta de tiempos de paso. */
-export class ArrivalsFormatError extends Error {}
+export class ArrivalsFormatError extends FormatError {}
 
 const HTTP_ERROR_STATUS_MIN = 400;
 const ARRIVING_PATTERN = /parada|llegando|inminente/;

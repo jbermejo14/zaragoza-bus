@@ -1,8 +1,9 @@
+import { FormatError } from './format-error';
 import { URBAN_STOP_ID_PREFIX } from './config';
 import type { BusStop, Coordinates } from './types';
 
 /** Error de formato en la respuesta del listado de postes. */
-export class StopsFormatError extends Error {}
+export class StopsFormatError extends FormatError {}
 
 export interface StopListPage {
   stops: BusStop[];
