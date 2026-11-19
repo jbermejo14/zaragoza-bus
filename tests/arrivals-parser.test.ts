@@ -17,6 +17,8 @@ test('parseMinutes interpreta cadenas', () => {
   assert.equal(parseMinutes('En la parada.'), 0);
   assert.equal(parseMinutes('LLEGANDO'), 0);
   assert.equal(parseMinutes('Inminente'), 0);
+  assert.equal(parseMinutes('Llegándo'), 0);
+  assert.equal(parseMinutes('EN LA PARADA'), 0);
   assert.equal(parseMinutes('Sin estimacin.'), null);
   assert.equal(parseMinutes(''), null);
 });
@@ -58,6 +60,21 @@ test('parseArrivals descarta elementos sin línea', () => {
   assert.equal(result[0].line, '21');
 });
 
+test('parseArrivals descarta linea vacía, en blanco o no textual', () => {
+  const result = parseArrivals({
+    destinos: [
+      { linea: '', destino: 'A', primero: '1 minutos.' },
+      { linea: '  ', destino: 'B', primero: '1 minutos.' },
+      { linea: 21, destino: 'C', primero: '1 minutos.' },
+      { linea: '35', destino: 'D', primero: '2 minutos.' },
+    ],
+  });
+  assert.deepEqual(
+    result.map((arrival) => arrival.line),
+    ['35'],
+  );
+});
+
 test('parseArrivals une filas del mismo grupo y conserva los dos menores', () => {
   const result = parseArrivals({
     destinos: [
@@ -97,6 +114,14 @@ test('parseArrivals incluye el mensaje de la API cuando status >= 400', () => {
     () => parseArrivals({ status: 400, mensaje: 'NoHttpResponseException' }),
     (error: unknown) => error instanceof ArrivalsFormatError && error.message.includes('NoHttpResponseException'),
   );
+});
+
+test('parseArrivals lanza con status >= 400 aunque no haya mensaje', () => {
+  assert.throws(() => parseArrivals({ status: 500 }), /500.*sin mensaje/);
+});
+
+test('parseArrivals no lanza con status 200', () => {
+  assert.deepEqual(parseArrivals({ status: 200, destinos: [] }), []);
 });
 
 test('parseArrivals acepta destinos vacío', () => {

@@ -6,8 +6,9 @@ const DIGITS_ONLY = /^\d+$/;
 const CIRCULAR_LINE = /^ci/i;
 const C_LINE = /^c/i;
 const NIGHT_LINE = /^n/i;
-const NATURAL_ORDER = { numeric: true } as const;
 const SPANISH_LOCALE = 'es';
+const naturalCollator = new Intl.Collator(SPANISH_LOCALE, { numeric: true });
+const nameCollator = new Intl.Collator(SPANISH_LOCALE);
 
 const LINE_GROUP_NUMERIC = 0;
 const LINE_GROUP_CIRCULAR = 1;
@@ -16,10 +17,18 @@ const LINE_GROUP_NIGHT = 3;
 const LINE_GROUP_OTHER = 4;
 
 function stopSearchLineGroup(line: string): number {
-  if (DIGITS_ONLY.test(line)) return LINE_GROUP_NUMERIC;
-  if (CIRCULAR_LINE.test(line)) return LINE_GROUP_CIRCULAR;
-  if (C_LINE.test(line)) return LINE_GROUP_C;
-  if (NIGHT_LINE.test(line)) return LINE_GROUP_NIGHT;
+  if (DIGITS_ONLY.test(line)) {
+    return LINE_GROUP_NUMERIC;
+  }
+  if (CIRCULAR_LINE.test(line)) {
+    return LINE_GROUP_CIRCULAR;
+  }
+  if (C_LINE.test(line)) {
+    return LINE_GROUP_C;
+  }
+  if (NIGHT_LINE.test(line)) {
+    return LINE_GROUP_NIGHT;
+  }
   return LINE_GROUP_OTHER;
 }
 
@@ -32,7 +41,7 @@ export function compareLines(a: string, b: string): number {
   if (groupDifference !== 0) {
     return groupDifference;
   }
-  return a.localeCompare(b, SPANISH_LOCALE, NATURAL_ORDER);
+  return naturalCollator.compare(a, b);
 }
 
 /** Líneas distintas de todos los postes, ordenadas con `compareLines`. */
@@ -52,12 +61,11 @@ export function findStopByNumber(stops: readonly BusStop[], number: string): Bus
 }
 
 function stopSearchCompareNumbers(a: BusStop, b: BusStop): number {
-  return a.number.localeCompare(b.number, SPANISH_LOCALE, NATURAL_ORDER);
+  return naturalCollator.compare(a.number, b.number);
 }
 
-function stopSearchHasLine(stop: BusStop, line: string): boolean {
-  const wanted = line.toLowerCase();
-  return stop.lines.some((candidate) => candidate.toLowerCase() === wanted);
+function stopSearchHasLine(stop: BusStop, lowerCaseLine: string): boolean {
+  return stop.lines.some((candidate) => candidate.toLowerCase() === lowerCaseLine);
 }
 
 function stopSearchByNumberPrefix(stops: readonly BusStop[], digits: string): BusStop[] {
@@ -72,7 +80,6 @@ function stopSearchByNumberPrefix(stops: readonly BusStop[], digits: string): Bu
 
 interface StopSearchCandidate {
   stop: BusStop;
-  normalizedName: string;
   startsWord: boolean;
 }
 
@@ -86,7 +93,7 @@ function stopSearchByName(stops: readonly BusStop[], tokens: readonly string[]):
   for (const stop of stops) {
     const normalizedName = normalizeText(stop.name);
     if (tokens.every((token) => normalizedName.includes(token))) {
-      candidates.push({ stop, normalizedName, startsWord: stopSearchStartsWord(normalizedName, tokens) });
+      candidates.push({ stop, startsWord: stopSearchStartsWord(normalizedName, tokens) });
     }
   }
   return candidates
@@ -95,7 +102,7 @@ function stopSearchByName(stops: readonly BusStop[], tokens: readonly string[]):
       const startB = b.startsWord ? 0 : 1;
       return (
         startA - startB ||
-        a.stop.name.localeCompare(b.stop.name, SPANISH_LOCALE) ||
+        nameCollator.compare(a.stop.name, b.stop.name) ||
         stopSearchCompareNumbers(a.stop, b.stop)
       );
     })
@@ -113,11 +120,13 @@ export function searchStops(
   limit: number = SEARCH_RESULT_LIMIT,
 ): BusStop[] {
   const trimmedQuery = query.trim();
-  if (trimmedQuery === '' && line === null) {
+  const tokens = normalizeText(trimmedQuery).split(' ').filter((token) => token !== '');
+  if (tokens.length === 0 && line === null) {
     return [];
   }
-  const candidates = line === null ? stops : stops.filter((stop) => stopSearchHasLine(stop, line));
-  const tokens = normalizeText(trimmedQuery).split(' ').filter((token) => token !== '');
+  const lowerCaseLine = line === null ? null : line.toLowerCase();
+  const candidates =
+    lowerCaseLine === null ? stops : stops.filter((stop) => stopSearchHasLine(stop, lowerCaseLine));
   let results: BusStop[];
   if (tokens.length === 0) {
     results = [...candidates].sort(stopSearchCompareNumbers);

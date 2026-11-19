@@ -8,7 +8,7 @@ const ARRIVING_PATTERN = /parada|llegando|inminente/;
 const INTEGER_PATTERN = /\d+/;
 const LOWERCASE_WORDS = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'y']);
 const TRAILING_PUNCTUATION_PATTERN = /[.,]+$/;
-const COMBINING_MARKS_PATTERN = /[̀-ͯ]/g;
+const COMBINING_MARKS_PATTERN = /[\u0300-\u036f]/g;
 const KEPT_MINUTES_COUNT = 2;
 
 interface ArrivalGroup {
@@ -59,7 +59,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function assertValidResponse(json: unknown): asserts json is Record<string, unknown> {
+function readDestinations(json: unknown): unknown[] {
   if (!isRecord(json)) {
     throw new ArrivalsFormatError('La respuesta de tiempos de paso no es un objeto.');
   }
@@ -70,6 +70,7 @@ function assertValidResponse(json: unknown): asserts json is Record<string, unkn
   if (!Array.isArray(json.destinos)) {
     throw new ArrivalsFormatError('Falta el campo "destinos" (debe ser una lista) en la respuesta.');
   }
+  return json.destinos;
 }
 
 function addToGroups(groups: Map<string, ArrivalGroup>, item: unknown): void {
@@ -98,8 +99,12 @@ function groupToArrival(group: ArrivalGroup): Arrival {
 
 function compareArrivals(a: Arrival, b: Arrival): number {
   if (a.firstMinutes !== b.firstMinutes) {
-    if (a.firstMinutes === null) return 1;
-    if (b.firstMinutes === null) return -1;
+    if (a.firstMinutes === null) {
+      return 1;
+    }
+    if (b.firstMinutes === null) {
+      return -1;
+    }
     return a.firstMinutes - b.firstMinutes;
   }
   return a.line.localeCompare(b.line, 'es', { numeric: true });
@@ -107,9 +112,9 @@ function compareArrivals(a: Arrival, b: Arrival): number {
 
 /** Convierte la respuesta de tiempos de paso en llegadas ordenadas. Lanza ArrivalsFormatError si el formato no es válido. */
 export function parseArrivals(json: unknown): Arrival[] {
-  assertValidResponse(json);
+  const destinations = readDestinations(json);
   const groups = new Map<string, ArrivalGroup>();
-  for (const item of json.destinos as unknown[]) {
+  for (const item of destinations) {
     addToGroups(groups, item);
   }
   return [...groups.values()].map(groupToArrival).sort(compareArrivals);

@@ -80,6 +80,7 @@ test('parseStopListPage: sin totalCount numérico usa rawCount', () => {
 test('parseStopListPage: errores de formato', () => {
   assert.throws(() => parseStopListPage(null), StopsFormatError);
   assert.throws(() => parseStopListPage('texto'), StopsFormatError);
+  assert.throws(() => parseStopListPage([]), StopsFormatError);
   assert.throws(() => parseStopListPage({ totalCount: 1 }), /result/);
   assert.throws(() => parseStopListPage({ result: {} }), StopsFormatError);
 });

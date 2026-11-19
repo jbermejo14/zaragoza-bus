@@ -79,6 +79,6 @@ export function parseStopListPage(json: unknown): StopListPage {
     }
   }
   const rawCount = json.result.length;
-  const totalCount = typeof json.totalCount === 'number' ? json.totalCount : rawCount;
+  const totalCount = Number.isFinite(json.totalCount) ? (json.totalCount as number) : rawCount;
   return { stops, totalCount, rawCount };
 }
