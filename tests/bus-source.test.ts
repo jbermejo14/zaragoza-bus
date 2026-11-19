@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { describeFailure, fetchArrivals, fetchStops } from '../lib/bus-source';
 import type { FetchFunction } from '../lib/bus-source';
 import { demoArrivals } from '../lib/demo-data';
-import { REQUEST_TIMEOUT_MS, arrivalsUrl } from '../lib/config';
+import { REQUEST_TIMEOUT_MS, arrivalsProxyUrl, arrivalsUrl } from '../lib/config';
 import type { BusStop } from '../lib/types';
 
 const NOW = new Date(1_800_000_000_000);
@@ -29,6 +29,11 @@ function syntheticPage(offset: number, size: number): unknown {
     geometry: { type: 'Point', coordinates: [-0.88, 41.65] },
   }));
   return { totalCount: TOTAL_COUNT, start: offset, rows: size, result };
+}
+
+/** Motivo esperado cuando proxy y API municipal fallan exactamente igual. */
+function bothFailed(reason: string): string {
+  return `Proxy: ${reason} API municipal: ${reason}`;
 }
 
 function abortError(): Error {
@@ -104,7 +109,7 @@ test('fetchArrivals con respuesta válida devuelve live', async () => {
   const result = await fetchArrivals(STOP, fetchFn, NOW);
   assert.equal(result.source, 'live');
   assert.deepEqual(result.data, [{ line: '35', destination: 'Parque Goya', firstMinutes: 4, secondMinutes: 16 }]);
-  assert.deepEqual(urls, [arrivalsUrl(STOP.id)]);
+  assert.deepEqual(urls, [arrivalsProxyUrl(STOP.number)]);
 });
 
 test('fetchArrivals con 400 y mensaje de la API cae a demo con ese mensaje', async () => {
@@ -112,7 +117,7 @@ test('fetchArrivals con 400 y mensaje de la API cae a demo con ese mensaje', asy
   const result = await fetchArrivals(STOP, async () => jsonResponse(body, 400), NOW);
   assert.equal(result.source, 'demo');
   assert.deepEqual(result.data, demoArrivals(STOP, NOW));
-  assert.equal(result.fallbackReason, 'La API respondió con error HTTP 400: NoHttpResponseException.');
+  assert.equal(result.fallbackReason, bothFailed('La API respondió con error HTTP 400: NoHttpResponseException.'));
 });
 
 test('fetchArrivals con cuerpo no JSON informa del código HTTP', async () => {
@@ -125,7 +130,7 @@ test('fetchArrivals con TypeError y con aborto usa los mensajes de describeFailu
   const network = await fetchArrivals(STOP, async () => Promise.reject(new TypeError('x')), NOW);
   assert.match(network.fallbackReason ?? '', /CORS/);
   const timeout = await fetchArrivals(STOP, async () => Promise.reject(abortError()), NOW);
-  assert.equal(timeout.fallbackReason, 'La API no respondió en 8 s.');
+  assert.equal(timeout.fallbackReason, bothFailed('La API no respondió en 8 s.'));
 });
 
 test('fetchArrivals con formato inesperado cae a demo', async () => {
@@ -166,15 +171,18 @@ test('el temporizador aborta de verdad la petición pasado el tiempo límite', a
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const pending = fetchArrivals(STOP, fetchRespectingSignal(), NOW);
   context.mock.timers.tick(REQUEST_TIMEOUT_MS);
+  // Deja que el fallo del proxy se propague y arranque la petición a la API municipal.
+  await new Promise((resolve) => setImmediate(resolve));
+  context.mock.timers.tick(REQUEST_TIMEOUT_MS);
   const result = await pending;
   assert.equal(result.source, 'demo');
-  assert.equal(result.fallbackReason, 'La API no respondió en 8 s.');
+  assert.equal(result.fallbackReason, bothFailed('La API no respondió en 8 s.'));
 });
 
 test('un aborto durante la lectura del cuerpo se describe como tiempo agotado', async () => {
   const response = { ok: true, status: 200, statusText: 'OK', json: async () => Promise.reject(abortError()) };
   const result = await fetchArrivals(STOP, async () => response as unknown as Response, NOW);
-  assert.equal(result.fallbackReason, 'La API no respondió en 8 s.');
+  assert.equal(result.fallbackReason, bothFailed('La API no respondió en 8 s.'));
 });
 
 test('fetchStops deduplica postes repetidos entre páginas', async () => {
@@ -228,22 +236,99 @@ test('una respuesta 200 con cuerpo no JSON es un error de formato, no un error H
   assert.equal(result.source, 'demo');
   assert.equal(
     result.fallbackReason,
-    'La API devolvió un formato inesperado: el cuerpo de la respuesta no es JSON',
+    bothFailed('La API devolvió un formato inesperado: el cuerpo de la respuesta no es JSON'),
   );
 });
 
 test('un 500 con JSON sin mensaje y sin statusText dice «sin detalle»', async () => {
   const result = await fetchArrivals(STOP, async () => jsonResponse({ status: 500 }, 500), NOW);
-  assert.equal(result.fallbackReason, 'La API respondió con error HTTP 500: sin detalle.');
+  assert.equal(result.fallbackReason, bothFailed('La API respondió con error HTTP 500: sin detalle.'));
 });
 
 test('un mensaje de la API con punto final no duplica el punto', async () => {
   const result = await fetchArrivals(STOP, async () => jsonResponse({ mensaje: 'Fallo interno.' }, 500), NOW);
-  assert.equal(result.fallbackReason, 'La API respondió con error HTTP 500: Fallo interno.');
+  assert.equal(result.fallbackReason, bothFailed('La API respondió con error HTTP 500: Fallo interno.'));
 });
 
 test('un 500 sin mensaje usa el statusText si existe', async () => {
   const response = new Response('{}', { status: 500, statusText: 'Internal Server Error' });
   const result = await fetchArrivals(STOP, async () => response, NOW);
-  assert.equal(result.fallbackReason, 'La API respondió con error HTTP 500: Internal Server Error.');
+  assert.equal(result.fallbackReason, bothFailed('La API respondió con error HTTP 500: Internal Server Error.'));
+});
+
+const PROXY_SOURCE_URL = arrivalsProxyUrl(STOP.number);
+const PARQUE_GOYA_ROW = { linea: '35', destino: 'PARQUE GOYA.', primero: '4 minutos.', segundo: '16 minutos.' };
+
+/** Fetch falso que responde según la URL y registra las peticiones. */
+function routedFetch(routes: Record<string, () => Response>, urls: string[]): FetchFunction {
+  return async (url) => {
+    urls.push(url);
+    return routes[url]();
+  };
+}
+
+test('proxy correcto devuelve live sin llamar a la API municipal', async () => {
+  const urls: string[] = [];
+  const fetchFn = routedFetch({ [PROXY_SOURCE_URL]: () => jsonResponse({ destinos: [PARQUE_GOYA_ROW] }) }, urls);
+  const result = await fetchArrivals(STOP, fetchFn, NOW);
+  assert.equal(result.source, 'live');
+  assert.equal(result.data.length, 1);
+  assert.deepEqual(urls, [PROXY_SOURCE_URL]);
+});
+
+test('la URL del proxy usa el número del poste', async () => {
+  assert.equal(PROXY_SOURCE_URL, '/es/zaragoza-bus/api/poste/104');
+  assert.equal(arrivalsProxyUrl('a/b'), '/es/zaragoza-bus/api/poste/a%2Fb');
+});
+
+test('proxy 502 con {error} y API municipal correcta devuelve live', async () => {
+  const urls: string[] = [];
+  const fetchFn = routedFetch(
+    {
+      [PROXY_SOURCE_URL]: () => jsonResponse({ error: 'upstream caído' }, 502),
+      [arrivalsUrl(STOP.id)]: () => jsonResponse({ destinos: [PARQUE_GOYA_ROW] }),
+    },
+    urls,
+  );
+  const result = await fetchArrivals(STOP, fetchFn, NOW);
+  assert.equal(result.source, 'live');
+  assert.equal(result.fallbackReason, undefined);
+  assert.deepEqual(urls, [PROXY_SOURCE_URL, arrivalsUrl(STOP.id)]);
+});
+
+test('si fallan proxy y API municipal, demo con el motivo de ambos', async () => {
+  const fetchFn = routedFetch(
+    {
+      [PROXY_SOURCE_URL]: () => jsonResponse({ error: 'upstream caído' }, 502),
+      [arrivalsUrl(STOP.id)]: () => jsonResponse({ status: 400, mensaje: 'NoHttpResponseException' }, 400),
+    },
+    [],
+  );
+  const result = await fetchArrivals(STOP, fetchFn, NOW);
+  assert.equal(result.source, 'demo');
+  assert.deepEqual(result.data, demoArrivals(STOP, NOW));
+  assert.equal(
+    result.fallbackReason,
+    'Proxy: La API respondió con error HTTP 502: upstream caído. ' +
+      'API municipal: La API respondió con error HTTP 400: NoHttpResponseException.',
+  );
+});
+
+test('proxy con destinos vacíos es live con lista vacía y no prueba la siguiente fuente', async () => {
+  const urls: string[] = [];
+  const fetchFn = routedFetch({ [PROXY_SOURCE_URL]: () => jsonResponse({ destinos: [] }) }, urls);
+  const result = await fetchArrivals(STOP, fetchFn, NOW);
+  assert.equal(result.source, 'live');
+  assert.deepEqual(result.data, []);
+  assert.deepEqual(urls, [PROXY_SOURCE_URL]);
+});
+
+test('filas del proxy de la misma línea y destino se agrupan en un solo Arrival', async () => {
+  const rows = [
+    { linea: '35', destino: 'PARQUE GOYA.', primero: '9 minutos.', segundo: null },
+    { linea: '35', destino: 'PARQUE GOYA.', primero: '3 minutos.', segundo: null },
+  ];
+  const result = await fetchArrivals(STOP, async () => jsonResponse({ destinos: rows }), NOW);
+  assert.equal(result.source, 'live');
+  assert.deepEqual(result.data, [{ line: '35', destination: 'Parque Goya', firstMinutes: 3, secondMinutes: 9 }]);
 });

@@ -12,6 +12,14 @@ export function arrivalsUrl(stopId: string): string {
   return `${API_BASE}/${encodeURIComponent(stopId)}.json`;
 }
 
+/** Prefijo del proxy de tiempos del Worker de Ododex: debe coincidir con BASE_PATH de la sección y con el Worker ododex-zaragoza-bus. */
+export const ARRIVALS_PROXY_PREFIX = '/es/zaragoza-bus/api/poste/';
+
+/** URL (relativa al sitio) de los tiempos de paso de un poste a través del proxy. */
+export function arrivalsProxyUrl(stopNumber: string): string {
+  return `${ARRIVALS_PROXY_PREFIX}${encodeURIComponent(stopNumber)}`;
+}
+
 /** URL del trazado de una línea (geometría oficial publicada en 2013). */
 export function lineRouteUrl(line: string): string {
   return `${TRANSPORT_API_BASE}/linea-autobus/${encodeURIComponent(line)}.json?srsname=wgs84`;

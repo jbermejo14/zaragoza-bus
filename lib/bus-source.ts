@@ -1,5 +1,5 @@
 import type { Arrival, BusStop, SourcedResult } from './types';
-import { REQUEST_TIMEOUT_MS, STOP_LIST_PAGE_SIZE, STOP_LIST_URL, arrivalsUrl } from './config';
+import { REQUEST_TIMEOUT_MS, STOP_LIST_PAGE_SIZE, STOP_LIST_URL, arrivalsProxyUrl, arrivalsUrl } from './config';
 import { FormatError } from './format-error';
 import { parseStopListPage } from './stops-parser';
 import { parseArrivals } from './arrivals-parser';
@@ -45,8 +45,10 @@ export function describeFailure(error: unknown): string {
 
 function apiMessage(body: unknown): string | null {
   if (typeof body !== 'object' || body === null) return null;
-  const message = (body as { mensaje?: unknown }).mensaje;
-  return typeof message === 'string' ? message : null;
+  const { mensaje, error } = body as { mensaje?: unknown; error?: unknown };
+  // La API municipal usa `mensaje`; el proxy de Ododex usa `error`.
+  if (typeof mensaje === 'string') return mensaje;
+  return typeof error === 'string' ? error : null;
 }
 
 /** Lee el cuerpo como JSON; devuelve `undefined` (que nunca es JSON válido) si no lo es. */
@@ -108,16 +110,30 @@ export async function fetchStops(fetchFn: FetchFunction): Promise<SourcedResult<
   }
 }
 
-/** Pide los tiempos de paso de un poste; si algo falla, usa llegadas simuladas con el motivo. */
+async function requestArrivals(fetchFn: FetchFunction, url: string): Promise<Arrival[]> {
+  return parseArrivals(await requestJson(fetchFn, url));
+}
+
+/**
+ * Pide los tiempos de paso de un poste. Orden de fuentes: proxy de Ododex, API municipal y,
+ * si ambas fallan, llegadas simuladas con el motivo de cada fallo.
+ */
 export async function fetchArrivals(
   stop: BusStop,
   fetchFn: FetchFunction,
   now: Date = new Date(),
 ): Promise<SourcedResult<Arrival[]>> {
+  let proxyFailure: unknown;
   try {
-    const json = await requestJson(fetchFn, arrivalsUrl(stop.id));
-    return { data: parseArrivals(json), source: 'live' };
+    return { data: await requestArrivals(fetchFn, arrivalsProxyUrl(stop.number)), source: 'live' };
   } catch (error) {
-    return { data: demoArrivals(stop, now), source: 'demo', fallbackReason: describeFailure(error) };
+    // Se prueba la API municipal; el motivo del proxy se conserva para el indicador «Demo».
+    proxyFailure = error;
+  }
+  try {
+    return { data: await requestArrivals(fetchFn, arrivalsUrl(stop.id)), source: 'live' };
+  } catch (error) {
+    const fallbackReason = `Proxy: ${describeFailure(proxyFailure)} API municipal: ${describeFailure(error)}`;
+    return { data: demoArrivals(stop, now), source: 'demo', fallbackReason };
   }
 }
