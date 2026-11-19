@@ -86,7 +86,7 @@ Responsabilidad: normalizar texto para comparar búsquedas.
 export function normalizeText(value: string): string;
 ```
 
-Minúsculas, sin tildes ni diéresis (NFD y eliminación de marcas combinantes), `ñ`→`n`, cualquier carácter que no sea letra o dígito pasa a espacio, espacios colapsados y recortados. `"P. Independencia N.º 25"` → `"p independencia n o 25"`; `"  Delicias–Ávila "` → `"delicias avila"`.
+Minúsculas, sin tildes ni diéresis (NFKD, para que `º` pase a `o`, y eliminación de marcas combinantes), `ñ`→`n`, cualquier carácter que no sea letra o dígito pasa a espacio, espacios colapsados y recortados. `"P. Independencia N.º 25"` → `"p independencia n o 25"`; `"  Delicias–Ávila "` → `"delicias avila"`.
 
 ### 3.2 `lib/stops-parser.ts` (types, config)
 
