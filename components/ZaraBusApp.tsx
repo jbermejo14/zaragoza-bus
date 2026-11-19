@@ -99,7 +99,7 @@ export default function ZaraBusApp() {
   const isSearching = query.trim() !== '' || line !== null;
 
   return (
-    <div className="flex h-dvh flex-col lg:flex-row">
+    <div className="app-shell flex flex-col lg:flex-row">
       <section
         className={`flex min-h-0 flex-col lg:w-[420px] lg:flex-none lg:border-r lg:border-line ${
           mapVisible ? 'flex-none' : 'flex-1'
@@ -150,7 +150,7 @@ export default function ZaraBusApp() {
           )}
         </div>
       </section>
-      <div className={`relative min-h-0 lg:block lg:flex-1 ${mapVisible ? 'flex-1' : 'hidden'}`}>
+      <div className={`relative isolate min-h-0 lg:block lg:flex-1 ${mapVisible ? 'flex-1' : 'hidden'}`}>
         <BusMapLoader
           stops={stops}
           selectedStop={selectedStop}

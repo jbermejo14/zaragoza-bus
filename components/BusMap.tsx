@@ -1,7 +1,7 @@
 'use client';
 
 import type * as Leaflet from 'leaflet';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   CITY_CENTER,
   MAP_ATTRIBUTION,
@@ -12,6 +12,7 @@ import {
 import type { LineRoute } from '../lib/line-route';
 import type { BusStop, Coordinates } from '../lib/types';
 import { L } from './leaflet-with-clusters';
+import { readMapColors, type MapColors } from './map-colors';
 
 interface BusMapProps {
   stops: readonly BusStop[];
@@ -28,9 +29,6 @@ const ROUTE_WEIGHT = 4;
 const ROUTE_OPACITY = 0.75;
 const ROUTE_FIT_PADDING_PX = 40;
 
-const COLOR_ACCENT = '#DC2626';
-const COLOR_WHITE = '#FFFFFF';
-const COLOR_USER = '#2563EB';
 const STOP_RADIUS = 6;
 const SELECTED_STOP_RADIUS = 11;
 const USER_RADIUS = 8;
@@ -52,10 +50,10 @@ function createBaseMap(container: HTMLElement): Leaflet.Map {
   return map;
 }
 
-function createRoutePolyline(path: Coordinates[]): Leaflet.Polyline {
+function createRoutePolyline(path: Coordinates[], colors: MapColors): Leaflet.Polyline {
   return L.polyline(path.map(toLatLng), {
     pane: ROUTE_PANE,
-    color: COLOR_ACCENT,
+    color: colors.stop,
     weight: ROUTE_WEIGHT,
     opacity: ROUTE_OPACITY,
     interactive: false,
@@ -75,12 +73,12 @@ function createClusterGroup(): Leaflet.MarkerClusterGroup {
   });
 }
 
-function createStopMarker(stop: BusStop, onSelect: (stop: BusStop) => void): Leaflet.CircleMarker {
+function createStopMarker(stop: BusStop, onSelect: (stop: BusStop) => void, colors: MapColors): Leaflet.CircleMarker {
   const marker = L.circleMarker(toLatLng(stop.coordinates), {
     radius: STOP_RADIUS,
-    fillColor: COLOR_ACCENT,
+    fillColor: colors.stop,
     fillOpacity: FILL_OPACITY,
-    color: COLOR_WHITE,
+    color: colors.stopBorder,
     weight: STOP_BORDER_WEIGHT,
   });
   marker.bindTooltip(`(${stop.number}) ${stop.name}`, { className: 'stop-tooltip' });
@@ -90,6 +88,7 @@ function createStopMarker(stop: BusStop, onSelect: (stop: BusStop) => void): Lea
 
 /** Mapa Leaflet con los postes agrupados, el poste seleccionado resaltado y la posición del usuario. */
 export default function BusMap({ stops, selectedStop, userPosition, route, onSelectStop }: BusMapProps) {
+  const [colors] = useState(readMapColors);
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Leaflet.Map | null>(null);
   const clusterRef = useRef<Leaflet.MarkerClusterGroup | null>(null);
@@ -136,8 +135,8 @@ export default function BusMap({ stops, selectedStop, userPosition, route, onSel
       return;
     }
     cluster.clearLayers();
-    cluster.addLayers(stops.map((stop) => createStopMarker(stop, (selected) => onSelectStopRef.current(selected))));
-  }, [stops]);
+    cluster.addLayers(stops.map((stop) => createStopMarker(stop, (selected) => onSelectStopRef.current(selected), colors)));
+  }, [stops, colors]);
 
   useEffect(() => {
     const layer = routeLayerRef.current;
@@ -149,12 +148,12 @@ export default function BusMap({ stops, selectedStop, userPosition, route, onSel
     if (route === null) {
       return;
     }
-    route.paths.forEach((path) => createRoutePolyline(path).addTo(layer));
+    route.paths.forEach((path) => createRoutePolyline(path, colors).addTo(layer));
     // Con un poste seleccionado la vista ya está centrada en él: no se la quita.
     if (selectedStopRef.current === null) {
       map.fitBounds(layer.getBounds(), { padding: [ROUTE_FIT_PADDING_PX, ROUTE_FIT_PADDING_PX] });
     }
-  }, [route]);
+  }, [route, colors]);
 
   useEffect(() => {
     const layer = selectionLayerRef.current;
@@ -169,14 +168,14 @@ export default function BusMap({ stops, selectedStop, userPosition, route, onSel
     const center = toLatLng(selectedStop.coordinates);
     L.circleMarker(center, {
       radius: SELECTED_STOP_RADIUS,
-      fillColor: COLOR_ACCENT,
+      fillColor: colors.stop,
       fillOpacity: FILL_OPACITY,
-      color: COLOR_WHITE,
+      color: colors.stopBorder,
       weight: SELECTED_BORDER_WEIGHT,
       interactive: false,
     }).addTo(layer);
     map.setView(center, MAP_SELECTED_ZOOM);
-  }, [selectedStop]);
+  }, [selectedStop, colors]);
 
   useEffect(() => {
     const layer = userLayerRef.current;
@@ -190,14 +189,14 @@ export default function BusMap({ stops, selectedStop, userPosition, route, onSel
     }
     L.circleMarker(toLatLng(userPosition), {
       radius: USER_RADIUS,
-      fillColor: COLOR_USER,
+      fillColor: colors.user,
       fillOpacity: FILL_OPACITY,
-      color: COLOR_WHITE,
+      color: colors.stopBorder,
       weight: STOP_BORDER_WEIGHT,
       interactive: false,
     }).addTo(layer);
     map.setView(toLatLng(userPosition), MAP_DEFAULT_ZOOM);
-  }, [userPosition]);
+  }, [userPosition, colors]);
 
   return <div ref={containerRef} className="absolute inset-0" role="region" aria-label="Mapa de postes" />;
 }

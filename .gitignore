@@ -12,3 +12,6 @@ next-env.d.ts
 # variables de entorno locales
 .env*.local
 .env
+
+# datos personales del titular (la plantilla config/titular.example.json sí va a git)
+/config/titular.json

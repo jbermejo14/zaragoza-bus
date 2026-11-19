@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/* CSS de Leaflet y markercluster en la capa base: sin capa, sus reglas ganan a las
+   utilidades de Tailwind (h-full, inset-0...) y el mapa puede quedar sin alto. */
+@import "leaflet/dist/leaflet.css" layer(base);
+@import "leaflet.markercluster/dist/MarkerCluster.css" layer(base);
+
+/* ==========================================================================
+   Ododex - Autobús de Zaragoza
+   Paleta blanca y roja de ZaraBus. Solo tema claro. Los colores se definen aquí
+   y los componentes los usan por nombre (bg-accent, text-muted...), nunca como hex.
+   ========================================================================== */
+
 @theme {
   --color-surface: #ffffff;
   --color-card: #f8fafc;
@@ -16,44 +27,286 @@
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
 }
 
-html,
-body {
-  height: 100%;
-  background-color: #ffffff;
-  color: #0f172a;
+/* Constantes que no son colores de utilidad de Tailwind. Los colores del mapa se leen
+   en tiempo de ejecución (Leaflet los pinta como atributos SVG, que no admiten var()). */
+:root {
+  --site-header-height: 3.5rem;
+  --app-min-height: 30rem;
+  --map-stop-color: var(--color-accent);
+  --map-stop-border-color: var(--color-surface);
+  --map-user-color: #2563eb;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 body {
-  overflow-x: hidden;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.5;
 }
 
 :focus-visible {
-  outline: 2px solid #dc2626;
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 
-.leaflet-container {
-  background: #f8fafc;
-  font-family: inherit;
+/* Cabecera de Ododex: alto fijo para que la app pueda ocupar el resto de la pantalla. */
+.site-header {
+  background-color: var(--color-card);
+  border-bottom: 1px solid var(--color-line);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: var(--site-header-height);
 }
 
-/* Icono de agrupación: círculo rojo con el número en blanco. */
-.zb-cluster {
+.header-container {
+  max-width: 1240px;
+  height: 100%;
+  margin: 0 auto;
+  padding: 0 1rem;
   display: flex;
   align-items: center;
-  justify-content: center;
-  border: 3px solid #ffffff;
-  border-radius: 9999px;
-  background: #dc2626;
-  color: #ffffff;
-  font-size: 13px;
-  font-weight: 700;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.35);
+  justify-content: space-between;
+  gap: 1rem;
 }
 
-.stop-tooltip {
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 44px;
+  text-decoration: none;
+}
+
+.brand-logo {
+  height: 28px;
+  width: auto;
+  display: block;
+}
+
+.brand-separator {
+  display: none;
+  width: 1px;
+  height: 24px;
+  background-color: var(--color-line);
+}
+
+.brand-section {
+  font-size: 0.9rem;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--color-muted);
+}
+
+/* La app ocupa el alto visible bajo la cabecera de Ododex. */
+.app-shell {
+  height: calc(100dvh - var(--site-header-height));
+  min-height: var(--app-min-height);
+}
+
+/* Layout */
+.main-wrapper {
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 2.5rem;
+  flex: 1;
+}
+
+.about-section {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 2.5rem 1rem;
+}
+
+.about-section h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.about-section p {
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--color-ink);
+  margin-bottom: 0.75rem;
+}
+
+/* Cards */
+.card {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0.7rem 1.4rem;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  text-decoration: none;
+}
+
+.btn-secondary {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-line);
+  color: var(--color-muted);
+}
+
+.btn-secondary:hover {
+  color: var(--color-ink);
+  border-color: var(--color-accent);
+}
+
+/* Footer */
+.site-footer {
+  background-color: var(--color-card);
+  border-top: 1px solid var(--color-line);
+  padding: 2rem 1rem;
+  margin-top: auto;
+  text-align: center;
+}
+
+.footer-container {
+  max-width: 1240px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.footer-text {
+  font-size: 0.9rem;
+  color: var(--color-ink);
+}
+
+.footer-subtext {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+.footer-legal {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem 1rem;
+  font-size: 0.8rem;
+  margin-top: 0.4rem;
+}
+
+.footer-legal a {
+  color: var(--color-muted);
+  padding: 0.5rem 0;
+  transition: color 0.15s;
+}
+
+.footer-legal a:hover {
+  color: var(--color-accent);
+}
+
+.footer-subtext a {
+  text-decoration: underline;
+}
+
+/* Páginas legales */
+.legal-text h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 1.5rem 0 0.5rem;
+}
+
+.legal-text h2:first-child {
+  margin-top: 0;
+}
+
+.legal-text p,
+.legal-text li {
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--color-ink);
+}
+
+.legal-text p {
+  margin-bottom: 0.75rem;
+}
+
+.legal-text ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.legal-text a {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+.guide-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  text-align: left;
+}
+
+.guide-table th,
+.guide-table td {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.guide-table th {
+  background-color: var(--color-card);
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* Breadcrumbs */
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--color-muted);
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.breadcrumbs a {
+  color: var(--color-muted);
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.breadcrumbs a:hover {
+  color: var(--color-accent);
+}
+
+.breadcrumbs .current {
+  color: var(--color-accent);
+  font-weight: 600;
 }
 
 /* Desplazamiento horizontal sin barra visible (táctil y rueda siguen funcionando). */
@@ -65,8 +318,57 @@ body {
   display: none;
 }
 
+@media (min-width: 768px) {
+  .main-wrapper {
+    padding: 2rem 1.5rem 3.5rem;
+  }
+
+  .header-container {
+    padding: 0 1.5rem;
+  }
+
+  .brand-logo {
+    height: 32px;
+  }
+
+  .brand-separator {
+    display: block;
+  }
+
+  .card {
+    padding: 2rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-spin {
     animation-duration: 3s;
+  }
+}
+
+/* Mapa. Dentro de @layer base para que las utilidades de Tailwind ganen a estas reglas. */
+@layer base {
+  .leaflet-container {
+    background: var(--color-card);
+    font-family: inherit;
+  }
+
+  /* Icono de agrupación: círculo rojo con el número en blanco. */
+  .zb-cluster {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid var(--color-surface);
+    border-radius: 9999px;
+    background: var(--color-accent);
+    color: var(--color-surface);
+    font-size: 13px;
+    font-weight: 700;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.35);
+  }
+
+  .stop-tooltip {
+    font-weight: 600;
+    color: var(--color-ink);
   }
 }

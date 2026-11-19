@@ -6,7 +6,7 @@ interface SourceBadgeProps {
   fallbackReason?: string;
 }
 
-const LIVE_TITLE = 'Datos en tiempo real del Ayuntamiento de Zaragoza';
+const LIVE_TITLE = 'Tiempos de paso en tiempo real';
 const DEMO_TITLE_FALLBACK = 'Datos simulados';
 
 /** Indicador de origen de los datos: «En vivo» (verde) o «Demo» (ámbar). */

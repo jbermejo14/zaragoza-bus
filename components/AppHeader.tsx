@@ -9,16 +9,20 @@ interface AppHeaderProps {
   onToggleMap: () => void;
 }
 
-/** Cabecera: logotipo, botón Mapa/Lista (solo móvil) e indicador En vivo / Demo. */
+/**
+ * Barra de la app: icono ZaraBus, botón Mapa/Lista (solo móvil) e indicador En vivo / Demo.
+ * La cabecera de Ododex ya muestra «Autobús de Zaragoza», así que el nombre «ZaraBus»
+ * solo se ve desde `sm`; en móvil queda como texto para lectores de pantalla (es el h1 de la página).
+ */
 export default function AppHeader({ source, fallbackReason, mapVisible, onToggleMap }: AppHeaderProps) {
   const ToggleIcon = mapVisible ? List : MapIcon;
   return (
     <header className="flex items-center justify-between gap-2 px-4 pt-3 pb-2">
       <div className="flex items-center gap-2">
-        <span className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-accent text-white" aria-hidden="true">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white" aria-hidden="true">
           <Bus size={20} />
         </span>
-        <span className="text-lg font-bold sm:text-xl tracking-tight">ZaraBus</span>
+        <h1 className="sr-only text-lg font-bold tracking-tight sm:not-sr-only">ZaraBus</h1>
       </div>
       <div className="flex items-center gap-1.5">
         <SourceBadge source={source} fallbackReason={fallbackReason} />
