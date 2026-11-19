@@ -14,7 +14,7 @@ export function Footer() {
           <strong>{SITE_NAME}</strong> &bull; Autobús de Zaragoza: cuándo llega tu bus a cada parada.
         </p>
         <p className="footer-subtext">
-          Mapa y datos de paradas © colaboradores de{' '}
+          Mapa © colaboradores de{' '}
           <a href={OPENSTREETMAP_COPYRIGHT_URL} target="_blank" rel="noopener noreferrer">
             OpenStreetMap
           </a>{' '}
