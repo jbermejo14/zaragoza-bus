@@ -5,6 +5,9 @@ interface ArrivalListProps {
   arrivals: readonly Arrival[];
   /** True mientras se esperan los primeros datos del poste. */
   loading: boolean;
+  /** Línea cuyo recorrido está resaltado desde esta lista (null = ninguna). */
+  highlightedLine: string | null;
+  onToggleRoute: (line: string) => void;
 }
 
 const SKELETON_ROW_COUNT = 3;
@@ -14,7 +17,7 @@ function arrivalKey(arrival: Arrival, index: number): string {
 }
 
 /** Llegadas del poste, con esqueleto al cargar y mensaje si no hay estimaciones. */
-export default function ArrivalList({ arrivals, loading }: ArrivalListProps) {
+export default function ArrivalList({ arrivals, loading, highlightedLine, onToggleRoute }: ArrivalListProps) {
   if (arrivals.length === 0 && loading) {
     return (
       <ul className="flex flex-col gap-2" aria-busy="true" aria-label="Cargando tiempos de paso">
@@ -34,7 +37,12 @@ export default function ArrivalList({ arrivals, loading }: ArrivalListProps) {
   return (
     <ul className="flex flex-col gap-2">
       {arrivals.map((arrival, index) => (
-        <ArrivalRow key={arrivalKey(arrival, index)} arrival={arrival} />
+        <ArrivalRow
+          key={arrivalKey(arrival, index)}
+          arrival={arrival}
+          routeActive={arrival.line === highlightedLine}
+          onToggleRoute={onToggleRoute}
+        />
       ))}
     </ul>
   );

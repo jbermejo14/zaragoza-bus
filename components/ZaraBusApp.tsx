@@ -2,10 +2,12 @@
 
 import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { findStopByNumber, listLines, searchStops } from '../lib/stop-search';
+import { pickRouteLine, toggleHighlightedLine } from '../lib/route-line';
 import type { BusStop } from '../lib/types';
 import { useArrivals } from '../lib/use-arrivals';
 import { useFavorites } from '../lib/use-favorites';
 import { useGeolocation } from '../lib/use-geolocation';
+import { useLineRoute } from '../lib/use-line-route';
 import { useStopHash } from '../lib/use-stop-hash';
 import { useStops } from '../lib/use-stops';
 import AppHeader from './AppHeader';
@@ -13,14 +15,21 @@ import BusMapLoader from './BusMapLoader';
 import HomePanel from './HomePanel';
 import LineFilter from './LineFilter';
 import SearchBox from './SearchBox';
+import RouteNotice from './RouteNotice';
 import SearchResults from './SearchResults';
 import StopBoard from './StopBoard';
+
+interface HighlightState {
+  stopNumber: string;
+  line: string | null;
+}
 
 /** Estado raíz: consulta, línea, poste seleccionado (en el hash) y mapa visible en móvil. */
 export default function ZaraBusApp() {
   const [query, setQuery] = useState('');
   const [line, setLine] = useState<string | null>(null);
   const [mapVisible, setMapVisible] = useState(false);
+  const [highlight, setHighlight] = useState<HighlightState | null>(null);
   const deferredQuery = useDeferredValue(query);
 
   const stopsState = useStops();
@@ -34,6 +43,10 @@ export default function ZaraBusApp() {
     [stops, stopNumber],
   );
   const arrivals = useArrivals(selectedStop);
+  // La línea resaltada pertenece al poste en que se pulsó: al cerrarlo o cambiar de poste deja de valer.
+  const highlightedLine = highlight !== null && highlight.stopNumber === stopNumber ? highlight.line : null;
+  const routeLine = pickRouteLine(line, highlightedLine);
+  const lineRoute = useLineRoute(routeLine);
   const lines = useMemo(() => listLines(stops), [stops]);
   const results = useMemo(() => searchStops(stops, deferredQuery, line), [stops, deferredQuery, line]);
 
@@ -73,7 +86,16 @@ export default function ZaraBusApp() {
     [stops, selectStop],
   );
 
-  const headerSource = selectedStop === null ? stopsState : arrivals;
+  const toggleRoute = useCallback(
+    (pressedLine: string) => {
+      if (stopNumber !== null) {
+        setHighlight({ stopNumber, line: toggleHighlightedLine(highlightedLine, pressedLine) });
+      }
+    },
+    [stopNumber, highlightedLine],
+  );
+
+  const headerSource =selectedStop === null ? stopsState : arrivals;
   const isSearching = query.trim() !== '' || line !== null;
 
   return (
@@ -91,6 +113,13 @@ export default function ZaraBusApp() {
         />
         <SearchBox value={query} onChange={changeQuery} onSubmit={submitSearch} />
         <LineFilter lines={lines} activeLine={line} onChange={changeLine} />
+        <RouteNotice
+          line={routeLine}
+          route={lineRoute.route}
+          loading={lineRoute.loading}
+          error={lineRoute.error}
+          fromFilter={line !== null}
+        />
         <div className={`min-h-0 flex-1 overflow-y-auto px-4 pb-6 ${mapVisible ? 'hidden lg:block' : ''}`}>
           {selectedStop !== null ? (
             <StopBoard
@@ -100,6 +129,8 @@ export default function ZaraBusApp() {
               source={arrivals.source}
               fallbackReason={arrivals.fallbackReason}
               updatedAt={arrivals.updatedAt}
+              highlightedLine={highlightedLine}
+              onToggleRoute={toggleRoute}
               isFavorite={favorites.isFavorite(selectedStop.id)}
               onBack={() => selectStopNumber(null)}
               onToggleFavorite={() => favorites.toggle(selectedStop.id)}
@@ -124,6 +155,7 @@ export default function ZaraBusApp() {
           stops={stops}
           selectedStop={selectedStop}
           userPosition={geolocation.position}
+          route={lineRoute.route}
           onSelectStop={selectStop}
         />
       </div>

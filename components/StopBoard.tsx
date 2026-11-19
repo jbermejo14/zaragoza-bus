@@ -10,11 +10,15 @@ interface StopBoardProps {
   source: DataSource | null;
   fallbackReason?: string;
   updatedAt: Date | null;
+  highlightedLine: string | null;
   isFavorite: boolean;
   onBack: () => void;
   onToggleFavorite: () => void;
   onRefresh: () => void;
+  onToggleRoute: (line: string) => void;
 }
+
+const DEMO_NOTICE = 'La API del Ayuntamiento no responde ahora mismo: se muestran tiempos simulados.';
 
 /** Marquesina de un poste: cabecera y lista de llegadas. */
 export default function StopBoard({
@@ -24,10 +28,12 @@ export default function StopBoard({
   source,
   fallbackReason,
   updatedAt,
+  highlightedLine,
   isFavorite,
   onBack,
   onToggleFavorite,
   onRefresh,
+  onToggleRoute,
 }: StopBoardProps) {
   return (
     <section aria-label={`Poste ${stop.number}`} className="flex flex-col gap-3">
@@ -41,12 +47,17 @@ export default function StopBoard({
         onRefresh={onRefresh}
       />
       {source === 'demo' && (
-        <p className="flex items-start gap-1.5 text-xs text-muted">
+        <p className="flex items-start gap-1.5 text-xs text-muted" title={fallbackReason}>
           <Info size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
-          <span>Datos simulados{fallbackReason ? `: ${fallbackReason}` : ''}</span>
+          <span>{DEMO_NOTICE}</span>
         </p>
       )}
-      <ArrivalList arrivals={arrivals} loading={loading} />
+      <ArrivalList
+        arrivals={arrivals}
+        loading={loading}
+        highlightedLine={highlightedLine}
+        onToggleRoute={onToggleRoute}
+      />
     </section>
   );
 }

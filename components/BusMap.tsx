@@ -9,6 +9,7 @@ import {
   MAP_SELECTED_ZOOM,
   MAP_TILE_URL,
 } from '../lib/config';
+import type { LineRoute } from '../lib/line-route';
 import type { BusStop, Coordinates } from '../lib/types';
 import { L } from './leaflet-with-clusters';
 
@@ -16,8 +17,16 @@ interface BusMapProps {
   stops: readonly BusStop[];
   selectedStop: BusStop | null;
   userPosition: Coordinates | null;
+  route: LineRoute | null;
   onSelectStop: (stop: BusStop) => void;
 }
+
+const ROUTE_PANE = 'zb-route';
+/** Por debajo del panel de vectores (400), donde están los postes, para que sigan siendo pulsables. */
+const ROUTE_PANE_Z_INDEX = 390;
+const ROUTE_WEIGHT = 4;
+const ROUTE_OPACITY = 0.75;
+const ROUTE_FIT_PADDING_PX = 40;
 
 const COLOR_ACCENT = '#DC2626';
 const COLOR_WHITE = '#FFFFFF';
@@ -39,7 +48,18 @@ function toLatLng(position: Coordinates): Leaflet.LatLngTuple {
 function createBaseMap(container: HTMLElement): Leaflet.Map {
   const map = L.map(container).setView(toLatLng(CITY_CENTER), MAP_DEFAULT_ZOOM);
   L.tileLayer(MAP_TILE_URL, { attribution: MAP_ATTRIBUTION, maxZoom: MAP_MAX_ZOOM }).addTo(map);
+  map.createPane(ROUTE_PANE).style.zIndex = String(ROUTE_PANE_Z_INDEX);
   return map;
+}
+
+function createRoutePolyline(path: Coordinates[]): Leaflet.Polyline {
+  return L.polyline(path.map(toLatLng), {
+    pane: ROUTE_PANE,
+    color: COLOR_ACCENT,
+    weight: ROUTE_WEIGHT,
+    opacity: ROUTE_OPACITY,
+    interactive: false,
+  });
 }
 
 function createClusterGroup(): Leaflet.MarkerClusterGroup {
@@ -69,16 +89,19 @@ function createStopMarker(stop: BusStop, onSelect: (stop: BusStop) => void): Lea
 }
 
 /** Mapa Leaflet con los postes agrupados, el poste seleccionado resaltado y la posición del usuario. */
-export default function BusMap({ stops, selectedStop, userPosition, onSelectStop }: BusMapProps) {
+export default function BusMap({ stops, selectedStop, userPosition, route, onSelectStop }: BusMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Leaflet.Map | null>(null);
   const clusterRef = useRef<Leaflet.MarkerClusterGroup | null>(null);
   const selectionLayerRef = useRef<Leaflet.LayerGroup | null>(null);
   const userLayerRef = useRef<Leaflet.LayerGroup | null>(null);
+  const routeLayerRef = useRef<Leaflet.FeatureGroup | null>(null);
   const onSelectStopRef = useRef(onSelectStop);
+  const selectedStopRef = useRef(selectedStop);
 
   useEffect(() => {
     onSelectStopRef.current = onSelectStop;
+    selectedStopRef.current = selectedStop;
   });
 
   // El mapa se crea una sola vez; el resto de efectos solo actualizan sus capas.
@@ -88,6 +111,7 @@ export default function BusMap({ stops, selectedStop, userPosition, onSelectStop
       return;
     }
     const map = createBaseMap(container);
+    routeLayerRef.current = L.featureGroup().addTo(map);
     clusterRef.current = createClusterGroup().addTo(map);
     selectionLayerRef.current = L.layerGroup().addTo(map);
     userLayerRef.current = L.layerGroup().addTo(map);
@@ -100,6 +124,7 @@ export default function BusMap({ stops, selectedStop, userPosition, onSelectStop
       map.remove();
       mapRef.current = null;
       clusterRef.current = null;
+      routeLayerRef.current = null;
       selectionLayerRef.current = null;
       userLayerRef.current = null;
     };
@@ -113,6 +138,23 @@ export default function BusMap({ stops, selectedStop, userPosition, onSelectStop
     cluster.clearLayers();
     cluster.addLayers(stops.map((stop) => createStopMarker(stop, (selected) => onSelectStopRef.current(selected))));
   }, [stops]);
+
+  useEffect(() => {
+    const layer = routeLayerRef.current;
+    const map = mapRef.current;
+    if (layer === null || map === null) {
+      return;
+    }
+    layer.clearLayers();
+    if (route === null) {
+      return;
+    }
+    route.paths.forEach((path) => createRoutePolyline(path).addTo(layer));
+    // Con un poste seleccionado la vista ya está centrada en él: no se la quita.
+    if (selectedStopRef.current === null) {
+      map.fitBounds(layer.getBounds(), { padding: [ROUTE_FIT_PADDING_PX, ROUTE_FIT_PADDING_PX] });
+    }
+  }, [route]);
 
   useEffect(() => {
     const layer = selectionLayerRef.current;
