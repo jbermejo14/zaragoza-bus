@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { describeFailure, fetchArrivals, fetchStops } from '../lib/bus-source';
 import type { FetchFunction } from '../lib/bus-source';
 import { demoArrivals } from '../lib/demo-data';
-import { arrivalsUrl } from '../lib/config';
+import { REQUEST_TIMEOUT_MS, arrivalsUrl } from '../lib/config';
 import type { BusStop } from '../lib/types';
 
 const NOW = new Date(1_800_000_000_000);
@@ -137,4 +137,113 @@ test('fetchArrivals con formato inesperado cae a demo', async () => {
 test('describeFailure devuelve el message de otros errores y texto de no errores', () => {
   assert.equal(describeFailure(new Error('algo raro')), 'algo raro');
   assert.equal(describeFailure('cadena'), 'cadena');
+});
+
+const ONE_PAGE_ROWS = 500;
+const MAX_PAGES = 10;
+
+function fetchRespectingSignal(): FetchFunction {
+  return (_url, init) =>
+    new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(abortError()));
+    });
+}
+
+function pageOfStops(ids: number[], totalCount?: number): Response {
+  const result = ids.map((id) => ({
+    id: `tuzsa-${id}`,
+    title: `(${id}) Calle ${id} Líneas: 21`,
+    geometry: { type: 'Point', coordinates: [-0.88, 41.65] },
+  }));
+  return jsonResponse(totalCount === undefined ? { result } : { totalCount, result });
+}
+
+function idRange(from: number, count: number): number[] {
+  return Array.from({ length: count }, (_, index) => from + index);
+}
+
+test('el temporizador aborta de verdad la petición pasado el tiempo límite', async (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  const pending = fetchArrivals(STOP, fetchRespectingSignal(), NOW);
+  context.mock.timers.tick(REQUEST_TIMEOUT_MS);
+  const result = await pending;
+  assert.equal(result.source, 'demo');
+  assert.equal(result.fallbackReason, 'La API no respondió en 8 s.');
+});
+
+test('un aborto durante la lectura del cuerpo se describe como tiempo agotado', async () => {
+  const response = { ok: true, status: 200, statusText: 'OK', json: async () => Promise.reject(abortError()) };
+  const result = await fetchArrivals(STOP, async () => response as unknown as Response, NOW);
+  assert.equal(result.fallbackReason, 'La API no respondió en 8 s.');
+});
+
+test('fetchStops deduplica postes repetidos entre páginas', async () => {
+  const pages = [pageOfStops(idRange(0, 3), 6), pageOfStops(idRange(1, 5), 6)];
+  let calls = 0;
+  const result = await fetchStops(async () => pages[calls++]);
+  assert.equal(result.source, 'live');
+  assert.equal(result.data.length, 6);
+  assert.equal(new Set(result.data.map((stop) => stop.id)).size, 6);
+});
+
+test('fetchStops para la paginación ante una página vacía', async () => {
+  let calls = 0;
+  const result = await fetchStops(async () => {
+    calls += 1;
+    return calls === 1 ? pageOfStops(idRange(0, ONE_PAGE_ROWS), 5000) : pageOfStops([], 5000);
+  });
+  assert.equal(calls, 2);
+  assert.equal(result.source, 'live');
+  assert.equal(result.data.length, ONE_PAGE_ROWS);
+});
+
+test('fetchStops no pide más de 10 páginas aunque totalCount sea enorme', async () => {
+  let calls = 0;
+  const result = await fetchStops(async () => {
+    const page = calls;
+    calls += 1;
+    return pageOfStops(idRange(page * ONE_PAGE_ROWS, ONE_PAGE_ROWS), 1_000_000);
+  });
+  assert.equal(calls, MAX_PAGES);
+  assert.equal(result.data.length, MAX_PAGES * ONE_PAGE_ROWS);
+});
+
+test('fetchStops sin totalCount se queda en una sola página', async () => {
+  let calls = 0;
+  const result = await fetchStops(async () => {
+    calls += 1;
+    return pageOfStops(idRange(0, 4));
+  });
+  assert.equal(calls, 1);
+  assert.equal(result.data.length, 4);
+});
+
+test('fetchStops con resultado vacío da el motivo exacto', async () => {
+  const result = await fetchStops(async () => jsonResponse({ totalCount: 0, result: [] }));
+  assert.equal(result.fallbackReason, 'La API no devolvió ningún poste urbano.');
+});
+
+test('una respuesta 200 con cuerpo no JSON es un error de formato, no un error HTTP', async () => {
+  const result = await fetchArrivals(STOP, async () => new Response('<html>', { status: 200 }), NOW);
+  assert.equal(result.source, 'demo');
+  assert.equal(
+    result.fallbackReason,
+    'La API devolvió un formato inesperado: el cuerpo de la respuesta no es JSON',
+  );
+});
+
+test('un 500 con JSON sin mensaje y sin statusText dice «sin detalle»', async () => {
+  const result = await fetchArrivals(STOP, async () => jsonResponse({ status: 500 }, 500), NOW);
+  assert.equal(result.fallbackReason, 'La API respondió con error HTTP 500: sin detalle.');
+});
+
+test('un mensaje de la API con punto final no duplica el punto', async () => {
+  const result = await fetchArrivals(STOP, async () => jsonResponse({ mensaje: 'Fallo interno.' }, 500), NOW);
+  assert.equal(result.fallbackReason, 'La API respondió con error HTTP 500: Fallo interno.');
+});
+
+test('un 500 sin mensaje usa el statusText si existe', async () => {
+  const response = new Response('{}', { status: 500, statusText: 'Internal Server Error' });
+  const result = await fetchArrivals(STOP, async () => response, NOW);
+  assert.equal(result.fallbackReason, 'La API respondió con error HTTP 500: Internal Server Error.');
 });

@@ -168,6 +168,7 @@ Responsabilidad: datos simulados realistas y deterministas.
 ```ts
 export function demoStops(): BusStop[];                       // parseStopListPage(data/stops-snapshot.json).stops
 export function demoArrivals(stop: BusStop, now: Date): Arrival[];
+export const DEMO_DESTINATIONS: Readonly<Record<string, readonly [string, string]>>; // exportada para las pruebas
 ```
 
 - `demoArrivals`: para cada línea del poste (si no tiene, devuelve `[]`), uno o dos destinos de la tabla `DEMO_DESTINATIONS` (constante del módulo: línea → par de cabeceras). Elige una dirección por línea con un hash estable de `stop.id + line`. Minutos: pseudoaleatorio determinista a partir de `stop.id`, línea y `Math.floor(now.getTime() / 30000)` (cambia cada 30 s); `firstMinutes` 0–15 (alguna vez 0 = «Llegando»), `secondMinutes` = primero + 6–18; ~1 de cada 12 llegadas con `secondMinutes: null`. Mismo `stop` y misma ventana de 30 s → mismo resultado. Ordenado como `parseArrivals`.

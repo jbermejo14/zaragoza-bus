@@ -21,8 +21,9 @@ const DEMO_DIRECTION_SALT = 'direccion';
 /**
  * Cabeceras de cada línea (par de sentidos). Es una tabla ILUSTRATIVA para el modo demo:
  * usa barrios reales de Zaragoza, pero no refleja los recorridos oficiales de las líneas.
+ * Ci1–Ci4 son circulares: Ci1 y Ci2 repiten el mismo destino en ambos sentidos.
  */
-const DEMO_DESTINATIONS: Readonly<Record<string, readonly [string, string]>> = {
+export const DEMO_DESTINATIONS: Readonly<Record<string, readonly [string, string]>> = {
   '21': ['Universidad', 'Plaza Aragón'],
   '22': ['Parque Goya', 'Plaza España'],
   '23': ['Valdespartera', 'Plaza Aragón'],
@@ -90,8 +91,8 @@ function demoTerminus(line: string, stopId: string): string {
   return pair[demoHash(`${stopId}|${line}|${DEMO_DIRECTION_SALT}`) % pair.length];
 }
 
-function demoArrival(stop: BusStop, line: string, window: number): Arrival {
-  const seed = `${stop.id}|${line}|${window}`;
+function demoArrival(stop: BusStop, line: string, windowIndex: number): Arrival {
+  const seed = `${stop.id}|${line}|${windowIndex}`;
   const firstMinutes = demoRandomInt(seed, DEMO_FIRST_SALT, 0, DEMO_MAX_FIRST_MINUTES);
   const gap = demoRandomInt(seed, DEMO_GAP_SALT, DEMO_MIN_GAP_MINUTES, DEMO_MAX_GAP_MINUTES);
   const hasSecond = demoHash(`${seed}|${DEMO_MISSING_SECOND_SALT}`) % DEMO_NO_SECOND_ESTIMATE_ONE_IN !== 0;
@@ -114,6 +115,7 @@ function compareDemoArrivals(a: Arrival, b: Arrival): number {
  * 30 s devuelve siempre lo mismo. Un poste sin líneas devuelve una lista vacía.
  */
 export function demoArrivals(stop: BusStop, now: Date): Arrival[] {
-  const window = Math.floor(now.getTime() / DEMO_WINDOW_MS);
-  return stop.lines.map((line) => demoArrival(stop, line, window)).sort(compareDemoArrivals);
+  const windowIndex = Math.floor(now.getTime() / DEMO_WINDOW_MS);
+  const uniqueLines = [...new Set(stop.lines)];
+  return uniqueLines.map((line) => demoArrival(stop, line, windowIndex)).sort(compareDemoArrivals);
 }

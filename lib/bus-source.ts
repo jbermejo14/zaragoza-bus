@@ -9,6 +9,8 @@ export type FetchFunction = (url: string, init?: RequestInit) => Promise<Respons
 const MAX_STOP_PAGES = 10;
 const MS_PER_SECOND = 1000;
 const NON_JSON_MESSAGE = 'el cuerpo de la respuesta no es JSON';
+const NO_DETAIL_MESSAGE = 'sin detalle';
+const TRAILING_PERIOD = /\.$/;
 
 /** Respuesta HTTP no satisfactoria o ilegible, con el mensaje que mande la API si lo hay. */
 class HttpStatusError extends Error {
@@ -20,6 +22,9 @@ class HttpStatusError extends Error {
   }
 }
 
+/** Respuesta correcta (200) cuyo cuerpo no se puede interpretar, por ejemplo porque no es JSON. */
+class ResponseFormatError extends Error {}
+
 function isAbortError(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as { name?: unknown }).name === 'AbortError';
 }
@@ -28,11 +33,15 @@ function isAbortError(error: unknown): boolean {
 export function describeFailure(error: unknown): string {
   if (isAbortError(error)) return `La API no respondió en ${REQUEST_TIMEOUT_MS / MS_PER_SECOND} s.`;
   if (error instanceof TypeError) return 'No se pudo conectar con la API (red o CORS bloqueado).';
-  if (error instanceof StopsFormatError || error instanceof ArrivalsFormatError) {
+  if (
+    error instanceof StopsFormatError ||
+    error instanceof ArrivalsFormatError ||
+    error instanceof ResponseFormatError
+  ) {
     return `La API devolvió un formato inesperado: ${error.message}`;
   }
   if (error instanceof HttpStatusError) {
-    return `La API respondió con error HTTP ${error.status}: ${error.message}.`;
+    return `La API respondió con error HTTP ${error.status}: ${error.message.replace(TRAILING_PERIOD, '')}.`;
   }
   return error instanceof Error ? error.message : String(error);
 }
@@ -43,12 +52,15 @@ function apiMessage(body: unknown): string | null {
   return typeof message === 'string' ? message : null;
 }
 
+/** Lee el cuerpo como JSON; devuelve `undefined` (que nunca es JSON válido) si no lo es. */
 async function readJsonBody(response: Response): Promise<unknown> {
   try {
     return await response.json();
-  } catch {
-    // El cuerpo no es JSON: se informa con el código HTTP en lugar del fallo de análisis.
-    throw new HttpStatusError(response.status, NON_JSON_MESSAGE);
+  } catch (error) {
+    // Un aborto por tiempo límite durante la lectura debe describirse como timeout.
+    if (isAbortError(error)) throw error;
+    // Cualquier otro fallo es un cuerpo no JSON: el llamador decide según el código HTTP.
+    return undefined;
   }
 }
 
@@ -60,8 +72,10 @@ async function requestJson(fetchFn: FetchFunction, url: string): Promise<unknown
     const response = await fetchFn(url, { signal: controller.signal });
     const body = await readJsonBody(response);
     if (!response.ok) {
-      throw new HttpStatusError(response.status, apiMessage(body) ?? response.statusText);
+      // En HTTP/2 `statusText` llega vacío, de ahí el último respaldo.
+      throw new HttpStatusError(response.status, apiMessage(body) || response.statusText || NO_DETAIL_MESSAGE);
     }
+    if (body === undefined) throw new ResponseFormatError(NON_JSON_MESSAGE);
     return body;
   } finally {
     clearTimeout(timer);

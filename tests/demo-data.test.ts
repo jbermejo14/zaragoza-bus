@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { demoArrivals, demoStops } from '../lib/demo-data';
+import { DEMO_DESTINATIONS, demoArrivals, demoStops } from '../lib/demo-data';
 import type { BusStop } from '../lib/types';
 
 const WINDOW_MS = 30_000;
@@ -89,5 +89,62 @@ test('las llegadas salen ordenadas por primer minuto y después por línea', () 
       const currentFirst = current.firstMinutes as number;
       assert.ok(previousFirst < currentFirst || (previousFirst === currentFirst && previous.line.localeCompare(current.line, 'es', { numeric: true }) <= 0));
     }
+  }
+});
+
+const SAMPLE_WINDOWS = 30;
+const GENERIC_LINES = ['99', 'X1'];
+
+function destinationsOf(line: string, stopId: string, windowIndex: number): string {
+  const [arrival] = demoArrivals(makeStop(stopId, [line]), new Date(BASE_TIME + windowIndex * WINDOW_MS));
+  return arrival.destination;
+}
+
+test('la dirección elegida para un poste y línea no cambia entre ventanas', () => {
+  for (const line of ['24', '35', 'Ci3', 'N4']) {
+    const first = destinationsOf(line, 'tuzsa-104', 0);
+    for (let windowIndex = 1; windowIndex < SAMPLE_WINDOWS; windowIndex += 1) {
+      assert.equal(destinationsOf(line, 'tuzsa-104', windowIndex), first);
+    }
+  }
+});
+
+test('todas las líneas urbanas conocidas resuelven a destinos de la tabla', () => {
+  const lines = [
+    ...range(21, 25),
+    ...range(28, 36),
+    ...range(38, 42),
+    ...range(50, 60),
+    'Ci1', 'Ci2', 'Ci3', 'Ci4',
+    'N1', 'N2', 'N3', 'N4', 'N5', 'N6', 'N7',
+  ];
+  for (const line of lines) {
+    assert.ok(line in DEMO_DESTINATIONS, `línea sin entrada en la tabla: ${line}`);
+    for (let index = 0; index < SAMPLE_WINDOWS; index += 1) {
+      assert.ok(DEMO_DESTINATIONS[line].includes(destinationsOf(line, `tuzsa-${index}`, 0)));
+    }
+  }
+});
+
+function range(from: number, to: number): string[] {
+  return Array.from({ length: to - from + 1 }, (_, index) => String(from + index));
+}
+
+test('dos postes distintos no dan siempre el mismo destino', () => {
+  const destinations = new Set<string>();
+  for (let index = 0; index < SAMPLE_WINDOWS; index += 1) {
+    destinations.add(destinationsOf('24', `tuzsa-${index}`, 0));
+  }
+  assert.ok(destinations.size > 1);
+});
+
+test('una línea repetida en el poste no duplica llegadas', () => {
+  const arrivals = demoArrivals(makeStop('tuzsa-7', ['24', '24', '35', '24']), new Date(BASE_TIME));
+  assert.deepEqual(arrivals.map((arrival) => arrival.line).sort(), ['24', '35']);
+});
+
+test('las líneas genéricas siguen usando el respaldo', () => {
+  for (const line of GENERIC_LINES) {
+    assert.ok(['Plaza España', `${line} Cabecera`].includes(destinationsOf(line, 'tuzsa-1', 0)));
   }
 });
