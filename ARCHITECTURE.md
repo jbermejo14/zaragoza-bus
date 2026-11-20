@@ -308,3 +308,77 @@ Sustituye la maquetación de §4 y §4b (cabecera Ododex arriba + app debajo) y 
 
 - 3.1–3.8: pruebas en `tests/<módulo>.test.ts` que cubran la interfaz pública y los casos límite descritos. Sin red.
 - 3.9: `npm run typecheck` y `npm run build` sin errores; verificación en navegador (búsqueda «104» e «Independencia», filtro de línea, marquesina con refresco, favorito persistente tras recargar, mapa con clusters, indicador Demo con la API caída) en escritorio y a 375 px.
+
+## 4d. Autobuses en el mapa con GPS de Avanza (2026-11-20)
+
+Añade la posición real de los autobuses que se acercan al poste abierto. Se hace por partes: primero el Worker y el módulo de datos (ficheros nuevos, sin tocar la interfaz del rediseño v2); el dibujo en el mapa, cuando el v2 esté commiteado.
+
+### Fuente (comprobado el 2026-11-20)
+
+`POST https://gps.avanzabus.com/index.php/zaragoza/fRefrescaEmpresaExternos`, cuerpo `poste=<número>&coche=0` (`application/x-www-form-urlencoded`; `coche=0` = todos). Es el endpoint, no documentado, que usa la web del operador. Sin CORS. Respuesta JSON (servida como `text/html`):
+
+```json
+{
+  "tablatiempos": "<html con los mismos coches y minutos>",
+  "maquinas": {
+    "0": { "coordenadas": { "0": { "LAT": 41.627026, "LON": -0.907306 } }, "icon": "https://gps.avanzabus.com/img/bus_rojo.png", "title": "P. Reyes de Aragón n.º 24", "info": "P. Reyes de Aragón n.º 24" },
+    "1": { "coordenadas": { "0": { "LAT": 41.6269, "LON": -0.9073 } }, "icon": "https://gps.avanzabus.com/img/bus.png", "title": "058 4709",
+           "info": "<table border=\"0\"><tr><td class=\"td_info\">Bus</td>…</tr><tr><td class=\"td_info2\">&nbsp4709</td><td class=\"td_info2\">058->FUENTE JUNQUERA</td><td class=\"td_info2\">0 min.</td><td class=\"td_info2\">0 kms.</td></tr></table>" }
+  }
+}
+```
+
+- La entrada con `icon` `bus_rojo.png` es el propio poste. Las demás son autobuses: una por coche y posición; el mismo coche puede aparecer en varias entradas si pasará varias veces (líneas circulares).
+- Cada fila `td_info2` de `info` tiene 4 celdas: coche (con `&nbsp`), `<línea>-><destino>` (línea con ceros a la izquierda: `058`, `039`; puede no ser numérica, p. ej. `CI2`), `<n> min.` y `<n> kms.`.
+- Sin autobuses, o con un poste que no existe, responde `{"tablatiempos":""}` sin `maquinas`. No se distinguen.
+- A veces tarda varios segundos.
+
+### Worker `ododex-zaragoza-bus` (`../ododex-sitio/workers/zaragoza-bus.mjs`): ruta nueva
+
+`GET /es/zaragoza-bus/api/gps/{poste}` con poste `/^\d{1,5}$/` (mismo patrón que `/api/poste/`). Respuesta 200:
+
+```json
+{
+  "poste": { "latitud": 41.627026, "longitud": -0.907306 },
+  "autobuses": [
+    { "coche": "4709", "linea": "58", "destino": "FUENTE JUNQUERA", "latitud": 41.6269, "longitud": -0.9073,
+      "llegadas": [ { "minutos": 21, "km": 4 }, { "minutos": 51, "km": 10 } ] }
+  ]
+}
+```
+
+- `poste`: coordenadas de la entrada del poste, o `null` si no viene.
+- `autobuses`: agrupados por coche (y línea+destino), con las llegadas ordenadas por minutos. Línea sin ceros a la izquierda si es numérica (`058` → `58`); si no, tal cual en mayúsculas. Destino con espacios normalizados.
+- Sin `maquinas` → `{ "poste": null, "autobuses": [] }` con 200.
+- Formato inesperado (no es objeto, `maquinas` no es objeto, una entrada de autobús sin coordenadas numéricas o con una fila que no tiene las 4 celdas esperadas) → 502. Mejor fallar que perder autobuses en silencio.
+- Petición al origen: POST con el cuerpo de arriba, `User-Agent: Ododex/1.0 (+https://ododex.com/es/zaragoza-bus)`, sin reenviar cabeceras del usuario, `redirect: "manual"`, tiempo máximo 5 s (como `/api/poste/`).
+- Caché: los POST no los cachea `cf.cacheTtl`, así que se usa la Cache API (`caches.default`) con una clave GET sintética por poste y 15 s de vida, para que muchos usuarios mirando el mismo poste hagan una sola petición a Avanza. Si `caches` no existe (pruebas), se omite.
+- Cabeceras y errores como `/api/poste/` (400, 404, 405, 502; `no-store` en errores; `public, max-age=15` en 200; `x-robots-tag: noindex`).
+- El módulo sigue exportando solo `default` (workerd rechaza otros exports).
+
+### Cliente: `lib/bus-vehicles.ts` (types, config, bus-source)
+
+```ts
+export interface VehicleArrival { minutes: number; km: number; }
+export interface BusVehicle { vehicle: string; line: string; destination: string; position: Coordinates; arrivals: VehicleArrival[]; }
+export interface StopVehicles { stopPosition: Coordinates | null; vehicles: BusVehicle[]; }
+export class VehiclesFormatError extends Error {}
+export function parseStopVehicles(json: unknown): StopVehicles;
+export async function fetchStopVehicles(stopNumber: string, fetchFn: FetchFunction): Promise<StopVehicles>;
+```
+
+- `parseStopVehicles`: valida el JSON del Worker; `VehiclesFormatError` (con mensaje que diga qué campo falla) si no es objeto, si `autobuses` no es array, o si un autobús no tiene coche, línea, coordenadas finitas o `llegadas` válidas.
+- `fetchStopVehicles`: `requestJson(fetchFn, vehiclesProxyUrl(stopNumber))` de bus-source y `parseStopVehicles`. Lanza ante cualquier fallo: sin datos demo (si falla, el mapa simplemente no dibuja autobuses). `describeFailure` de bus-source debe clasificar `VehiclesFormatError` como formato inesperado.
+- `lib/config.ts`: `VEHICLES_PROXY_PREFIX = '/es/zaragoza-bus/api/gps/'` y `vehiclesProxyUrl(stopNumber)`.
+
+### Interfaz (pendiente del v2)
+
+- Con un poste abierto, se piden sus autobuses junto con los tiempos (mismo refresco de 30 s y misma pausa con la pestaña oculta) y se dibujan en el mapa: icono de bus con el número de línea, tooltip «Línea 58 → Fuente Junquera · coche 4709 · 21 min (4 km)». Con filtro de línea activo, solo los de esa línea.
+- Se quitan del mapa al cerrar el poste. Si la petición falla, no se dibuja nada y no se muestra error (los tiempos siguen siendo la información principal).
+- Legales («Privacidad» y «Sobre este servicio»): las posiciones salen del sistema público de Avanza consultado por nuestro servidor, sin datos del usuario.
+
+### Criterios de aceptación
+
+- Worker: pruebas con `fetch` simulado (cuerpo real de ejemplo con dos entradas del mismo coche, fila de línea no numérica, respuesta vacía `{"tablatiempos":""}`, formato roto → 502, poste inválido → 400, timeout, cabeceras, que la petición es POST con el cuerpo y User-Agent correctos y sin cabeceras del usuario, y uso de la caché cuando `caches` existe).
+- `lib/bus-vehicles.ts`: `parseStopVehicles` con casos válidos y cada error; `fetchStopVehicles` con fetch simulado (éxito, HTTP 502 con `{error}`, formato roto).
+- Comprobación manual contra el origen real con el Worker ejecutado en Node antes de desplegar.
