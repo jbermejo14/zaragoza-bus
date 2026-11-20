@@ -1,9 +1,10 @@
 import React from 'react';
 import Link from 'next/link';
 import { BrandLogo } from './BrandLogo';
+import ThemeToggle from './ThemeToggle';
 import { SECTION_NAME } from '@/lib/site';
 
-/** Cabecera de Ododex: logo y nombre de la sección. Sin botón de tema (la web es solo clara). */
+/** Cabecera de Ododex de las páginas legales y la 404: logo, nombre de la sección y botón de tema. */
 export function Header() {
   return (
     <header className="site-header">
@@ -13,6 +14,7 @@ export function Header() {
           <span className="brand-separator" aria-hidden="true" />
           <span className="brand-section">{SECTION_NAME}</span>
         </Link>
+        <ThemeToggle />
       </div>
     </header>
   );

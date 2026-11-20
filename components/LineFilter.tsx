@@ -22,7 +22,7 @@ export default function LineFilter({ lines, activeLine, onChange }: LineFilterPr
             className={`shrink-0 rounded-full border px-3 py-1 text-sm font-semibold ${
               isActive
                 ? 'border-accent bg-accent text-white hover:bg-accent-hover'
-                : 'border-line bg-card text-ink hover:border-accent hover:text-accent'
+                : 'border-line bg-card text-ink hover:border-accent hover:text-accent-text'
             }`}
           >
             {line}

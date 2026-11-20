@@ -11,7 +11,7 @@ import { Footer } from '../components/Footer';
 import { getTitular, valorOPendiente } from '../lib/legal';
 
 const LEGAL_ROBOTS = { index: false, follow: true };
-const LEGAL_INHERITED_TERMS = ['MITECO', 'IEDMT', 'ITV', 'Real Decreto 920/2017', 'BOE', 'gasolina', 'AdSense', 'ododex-theme', 'Configurar cookies'];
+const LEGAL_INHERITED_TERMS = ['MITECO', 'IEDMT', 'ITV', 'Real Decreto 920/2017', 'BOE', 'gasolina', 'AdSense', 'Configurar cookies'];
 
 test('aviso legal: muestra el titular o el marcador, las fuentes y no se indexa', () => {
   const html = renderToStaticMarkup(<AvisoLegalPage />);
@@ -24,8 +24,9 @@ test('aviso legal: muestra el titular o el marcador, las fuentes y no se indexa'
   assert.deepEqual(avisoMetadata.robots, LEGAL_ROBOTS);
 });
 
-test('privacidad: titular, AEPD, favoritos locales, proxy de Ododex y geolocalización local', () => {
+test('privacidad: titular, AEPD, favoritos y tema locales, proxy de Ododex y geolocalización local', () => {
   const html = renderToStaticMarkup(<PrivacidadPage />);
+  assert.ok(html.includes('ododex-theme'));
   assert.ok(html.includes(valorOPendiente(getTitular(), 'nombre')));
   assert.ok(html.includes('AEPD'));
   assert.ok(html.includes('zarabus:favorites'));
@@ -35,9 +36,10 @@ test('privacidad: titular, AEPD, favoritos locales, proxy de Ododex y geolocaliz
   assert.deepEqual(privacidadMetadata.robots, LEGAL_ROBOTS);
 });
 
-test('cookies: documenta zarabus:favorites y declara que no hay cookies de terceros', () => {
+test('cookies: documenta zarabus:favorites y ododex-theme y declara que no hay cookies de terceros', () => {
   const html = renderToStaticMarkup(<CookiesPage />);
   assert.ok(html.includes('zarabus:favorites'));
+  assert.ok(html.includes('ododex-theme'));
   assert.ok(html.includes('no usa cookies de terceros'));
   assert.ok(html.includes('OpenStreetMap'));
   assert.deepEqual(cookiesMetadata.robots, LEGAL_ROBOTS);

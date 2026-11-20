@@ -8,7 +8,9 @@ Web estática (Next.js 16, exportación estática) para consultar cuándo llega 
 - Marquesina del poste: líneas, destino, primer y segundo autobús; refresco manual y automático cada 30 s.
 - Favoritos («Mis paradas», en `localStorage`) y «Cerca de mí» con la geolocalización del navegador.
 - Mapa OpenStreetMap con los 983 postes urbanos agrupados y el recorrido oficial de una línea.
-- Indicador «En vivo» / «Demo» en la barra de la app.
+- Indicador «En vivo» / «Demo» en la cabecera del panel.
+- Maqueta como `/es/tranvia-zaragoza`: mapa a pantalla completa con panel flotante (hoja deslizable en móvil); tema claro u oscuro según el sistema, con botón para cambiarlo (clave `ododex-theme`, compartida con las demás webs de Ododex).
+- Al elegir una línea, el mapa, la lista y la marquesina muestran solo esa línea.
 
 ## Fuentes de datos
 
@@ -61,4 +63,4 @@ Constantes de la app (URLs, tiempos de refresco, límites, mapa) en `lib/config.
 - Los tiempos dependen del HTML público de Avanza: si cambia su maquetación, el Worker cae a DNDzgz y, si este también falla, a la API municipal o a datos simulados.
 - No hay posiciones GPS de los autobuses: el Ayuntamiento no las publica.
 - Los recorridos son de 2013 y pueden no reflejar desvíos actuales.
-- Sin anuncios ni modo oscuro por decisión del titular.
+- Sin anuncios por decisión del titular.

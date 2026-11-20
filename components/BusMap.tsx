@@ -1,107 +1,80 @@
 'use client';
 
 import type * as Leaflet from 'leaflet';
-import { useEffect, useRef, useState } from 'react';
-import {
-  CITY_CENTER,
-  MAP_ATTRIBUTION,
-  MAP_DEFAULT_ZOOM,
-  MAP_SELECTED_ZOOM,
-  MAP_TILE_URL,
-} from '../lib/config';
+import { useEffect, useRef, type RefObject } from 'react';
+import { MAP_DEFAULT_ZOOM, MAP_SELECTED_ZOOM } from '../lib/config';
 import type { LineRoute } from '../lib/line-route';
 import type { BusStop, Coordinates } from '../lib/types';
+import {
+  boundsOfPositions,
+  createBaseMap,
+  createClusterGroup,
+  createRoutePolyline,
+  createStopMarker,
+  fitMapToBounds,
+  routeStyle,
+  selectedStopStyle,
+  stopStyle,
+  toLatLng,
+  userStyle,
+} from './bus-map-layers';
 import { L } from './leaflet-with-clusters';
-import { readMapColors, type MapColors } from './map-colors';
+import { measurePanelCover } from './map-viewport';
+import { useMapColors } from './use-map-colors';
 
 interface BusMapProps {
+  /** Postes que se dibujan: con filtro de línea, solo los de esa línea. */
   stops: readonly BusStop[];
   selectedStop: BusStop | null;
   userPosition: Coordinates | null;
+  /** Línea del filtro activo (null = sin filtro); su recorrido o sus postes se encuadran. */
+  lineFilter: string | null;
   route: LineRoute | null;
+  /** True cuando ya se sabe si hay recorrido (cargado o fallido); sin recorrido se encuadran los postes. */
+  routeSettled: boolean;
+  /** Panel flotante: el mapa encuadra dejando libre el hueco que tapa. */
+  panelRef: RefObject<HTMLElement | null>;
   onSelectStop: (stop: BusStop) => void;
 }
 
-const ROUTE_PANE = 'zb-route';
-/** Por debajo del panel de vectores (400), donde están los postes, para que sigan siendo pulsables. */
-const ROUTE_PANE_Z_INDEX = 390;
-const ROUTE_WEIGHT = 4;
-const ROUTE_OPACITY = 0.75;
-const ROUTE_FIT_PADDING_PX = 40;
-
-const STOP_RADIUS = 6;
-const SELECTED_STOP_RADIUS = 11;
-const USER_RADIUS = 8;
-const STOP_BORDER_WEIGHT = 2;
-const SELECTED_BORDER_WEIGHT = 3;
-const FILL_OPACITY = 1;
-const CLUSTER_ICON_SIZE_PX = 38;
-const CLUSTER_MAX_RADIUS_PX = 50;
-const MAP_MAX_ZOOM = 19;
-
-function toLatLng(position: Coordinates): Leaflet.LatLngTuple {
-  return [position.latitude, position.longitude];
-}
-
-function createBaseMap(container: HTMLElement): Leaflet.Map {
-  const map = L.map(container).setView(toLatLng(CITY_CENTER), MAP_DEFAULT_ZOOM);
-  L.tileLayer(MAP_TILE_URL, { attribution: MAP_ATTRIBUTION, maxZoom: MAP_MAX_ZOOM }).addTo(map);
-  map.createPane(ROUTE_PANE).style.zIndex = String(ROUTE_PANE_Z_INDEX);
-  return map;
-}
-
-function createRoutePolyline(path: Coordinates[], colors: MapColors): Leaflet.Polyline {
-  return L.polyline(path.map(toLatLng), {
-    pane: ROUTE_PANE,
-    color: colors.stop,
-    weight: ROUTE_WEIGHT,
-    opacity: ROUTE_OPACITY,
-    interactive: false,
-  });
-}
-
-function createClusterGroup(): Leaflet.MarkerClusterGroup {
-  return L.markerClusterGroup({
-    maxClusterRadius: CLUSTER_MAX_RADIUS_PX,
-    showCoverageOnHover: false,
-    iconCreateFunction: (cluster) =>
-      L.divIcon({
-        html: `<span>${cluster.getChildCount()}</span>`,
-        className: 'zb-cluster',
-        iconSize: L.point(CLUSTER_ICON_SIZE_PX, CLUSTER_ICON_SIZE_PX),
-      }),
-  });
-}
-
-function createStopMarker(stop: BusStop, onSelect: (stop: BusStop) => void, colors: MapColors): Leaflet.CircleMarker {
-  const marker = L.circleMarker(toLatLng(stop.coordinates), {
-    radius: STOP_RADIUS,
-    fillColor: colors.stop,
-    fillOpacity: FILL_OPACITY,
-    color: colors.stopBorder,
-    weight: STOP_BORDER_WEIGHT,
-  });
-  marker.bindTooltip(`(${stop.number}) ${stop.name}`, { className: 'stop-tooltip' });
-  marker.on('click', () => onSelect(stop));
-  return marker;
-}
-
-/** Mapa Leaflet con los postes agrupados, el poste seleccionado resaltado y la posición del usuario. */
-export default function BusMap({ stops, selectedStop, userPosition, route, onSelectStop }: BusMapProps) {
-  const [colors] = useState(readMapColors);
+/** Mapa Leaflet con los postes agrupados, el recorrido, el poste seleccionado y la posición del usuario. */
+export default function BusMap({
+  stops,
+  selectedStop,
+  userPosition,
+  lineFilter,
+  route,
+  routeSettled,
+  panelRef,
+  onSelectStop,
+}: BusMapProps) {
+  const colors = useMapColors();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Leaflet.Map | null>(null);
   const clusterRef = useRef<Leaflet.MarkerClusterGroup | null>(null);
+  const stopMarkersRef = useRef<Leaflet.CircleMarker[]>([]);
   const selectionLayerRef = useRef<Leaflet.LayerGroup | null>(null);
   const userLayerRef = useRef<Leaflet.LayerGroup | null>(null);
   const routeLayerRef = useRef<Leaflet.FeatureGroup | null>(null);
-  const onSelectStopRef = useRef(onSelectStop);
+  const colorsRef = useRef(colors);
+  const stopsRef = useRef(stops);
   const selectedStopRef = useRef(selectedStop);
+  const onSelectStopRef = useRef(onSelectStop);
 
   useEffect(() => {
-    onSelectStopRef.current = onSelectStop;
+    colorsRef.current = colors;
+    stopsRef.current = stops;
     selectedStopRef.current = selectedStop;
+    onSelectStopRef.current = onSelectStop;
   });
+
+  // Solo lee refs (el mapa y el panel), por eso los efectos que lo usan no lo declaran como dependencia.
+  const fitTo = (bounds: Leaflet.LatLngBounds, maxZoom?: number) => {
+    const map = mapRef.current;
+    if (map !== null) {
+      fitMapToBounds(map, bounds, measurePanelCover(panelRef.current), maxZoom);
+    }
+  };
 
   // El mapa se crea una sola vez; el resto de efectos solo actualizan sus capas.
   useEffect(() => {
@@ -115,7 +88,6 @@ export default function BusMap({ stops, selectedStop, userPosition, route, onSel
     selectionLayerRef.current = L.layerGroup().addTo(map);
     userLayerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
-    // En móvil el contenedor está oculto hasta pulsar «Mapa»: hay que recalcular su tamaño al mostrarse.
     const resizeObserver = new ResizeObserver(() => map.invalidateSize());
     resizeObserver.observe(container);
     return () => {
@@ -126,6 +98,7 @@ export default function BusMap({ stops, selectedStop, userPosition, route, onSel
       routeLayerRef.current = null;
       selectionLayerRef.current = null;
       userLayerRef.current = null;
+      stopMarkersRef.current = [];
     };
   }, []);
 
@@ -134,69 +107,69 @@ export default function BusMap({ stops, selectedStop, userPosition, route, onSel
     if (cluster === null) {
       return;
     }
+    const markers = stops.map((stop) =>
+      createStopMarker(stop, (selected) => onSelectStopRef.current(selected), colorsRef.current),
+    );
+    stopMarkersRef.current = markers;
     cluster.clearLayers();
-    cluster.addLayers(stops.map((stop) => createStopMarker(stop, (selected) => onSelectStopRef.current(selected), colors)));
-  }, [stops, colors]);
+    cluster.addLayers(markers);
+  }, [stops]);
+
+  // Cambio de tema: se repintan las capas existentes sin recrear el mapa ni los marcadores.
+  useEffect(() => {
+    stopMarkersRef.current.forEach((marker) => marker.setStyle(stopStyle(colors)));
+    routeLayerRef.current?.setStyle(routeStyle(colors));
+    selectionLayerRef.current?.eachLayer((layer) => (layer as Leaflet.CircleMarker).setStyle(selectedStopStyle(colors)));
+    userLayerRef.current?.eachLayer((layer) => (layer as Leaflet.CircleMarker).setStyle(userStyle(colors)));
+  }, [colors]);
 
   useEffect(() => {
     const layer = routeLayerRef.current;
-    const map = mapRef.current;
-    if (layer === null || map === null) {
+    if (layer === null) {
       return;
     }
     layer.clearLayers();
-    if (route === null) {
+    route?.paths.forEach((path) => createRoutePolyline(path, colorsRef.current).addTo(layer));
+  }, [route]);
+
+  // Encuadre del filtro de línea: su recorrido o, si no lo hay, sus postes. Con un poste abierto la vista ya está en él.
+  useEffect(() => {
+    const layer = routeLayerRef.current;
+    if (layer === null || lineFilter === null || selectedStopRef.current !== null) {
       return;
     }
-    route.paths.forEach((path) => createRoutePolyline(path, colors).addTo(layer));
-    // Con un poste seleccionado la vista ya está centrada en él: no se la quita.
-    if (selectedStopRef.current === null) {
-      map.fitBounds(layer.getBounds(), { padding: [ROUTE_FIT_PADDING_PX, ROUTE_FIT_PADDING_PX] });
+    if (route !== null) {
+      fitTo(layer.getBounds());
+    } else if (routeSettled) {
+      fitTo(boundsOfPositions(stopsRef.current.map((stop) => stop.coordinates)));
     }
-  }, [route, colors]);
+  }, [lineFilter, route, routeSettled]);
 
   useEffect(() => {
     const layer = selectionLayerRef.current;
-    const map = mapRef.current;
-    if (layer === null || map === null) {
+    if (layer === null) {
       return;
     }
     layer.clearLayers();
     if (selectedStop === null) {
       return;
     }
-    const center = toLatLng(selectedStop.coordinates);
-    L.circleMarker(center, {
-      radius: SELECTED_STOP_RADIUS,
-      fillColor: colors.stop,
-      fillOpacity: FILL_OPACITY,
-      color: colors.stopBorder,
-      weight: SELECTED_BORDER_WEIGHT,
-      interactive: false,
-    }).addTo(layer);
-    map.setView(center, MAP_SELECTED_ZOOM);
-  }, [selectedStop, colors]);
+    L.circleMarker(toLatLng(selectedStop.coordinates), selectedStopStyle(colorsRef.current)).addTo(layer);
+    fitTo(boundsOfPositions([selectedStop.coordinates]), MAP_SELECTED_ZOOM);
+  }, [selectedStop]);
 
   useEffect(() => {
     const layer = userLayerRef.current;
-    const map = mapRef.current;
-    if (layer === null || map === null) {
+    if (layer === null) {
       return;
     }
     layer.clearLayers();
     if (userPosition === null) {
       return;
     }
-    L.circleMarker(toLatLng(userPosition), {
-      radius: USER_RADIUS,
-      fillColor: colors.user,
-      fillOpacity: FILL_OPACITY,
-      color: colors.stopBorder,
-      weight: STOP_BORDER_WEIGHT,
-      interactive: false,
-    }).addTo(layer);
-    map.setView(toLatLng(userPosition), MAP_DEFAULT_ZOOM);
-  }, [userPosition, colors]);
+    L.circleMarker(toLatLng(userPosition), userStyle(colorsRef.current)).addTo(layer);
+    fitTo(boundsOfPositions([userPosition]), MAP_DEFAULT_ZOOM);
+  }, [userPosition]);
 
   return <div ref={containerRef} className="absolute inset-0" role="region" aria-label="Mapa de postes" />;
 }

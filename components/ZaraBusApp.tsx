@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useDeferredValue, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useMemo, useRef, useState, type ReactNode } from 'react';
+import { stopsForLine } from '../lib/line-filter';
 import { findStopByNumber, listLines, searchStops } from '../lib/stop-search';
 import { pickRouteLine, toggleHighlightedLine } from '../lib/route-line';
 import type { BusStop } from '../lib/types';
@@ -10,27 +11,42 @@ import { useGeolocation } from '../lib/use-geolocation';
 import { useLineRoute } from '../lib/use-line-route';
 import { useStopHash } from '../lib/use-stop-hash';
 import { useStops } from '../lib/use-stops';
-import AppHeader from './AppHeader';
+import AppPanel from './AppPanel';
 import BusMapLoader from './BusMapLoader';
 import HomePanel from './HomePanel';
 import LineFilter from './LineFilter';
-import SearchBox from './SearchBox';
+import PanelHeader from './PanelHeader';
 import RouteNotice from './RouteNotice';
+import SearchBox from './SearchBox';
 import SearchResults from './SearchResults';
 import StopBoard from './StopBoard';
+
+interface ZaraBusAppProps {
+  /** «Sobre este servicio» y pie de Ododex, pintados en el servidor (leen ficheros del disco). */
+  panelFooter: ReactNode;
+}
 
 interface HighlightState {
   stopNumber: string;
   line: string | null;
 }
 
-/** Estado raíz: consulta, línea, poste seleccionado (en el hash) y mapa visible en móvil. */
-export default function ZaraBusApp() {
+/** Clave de lo que muestra el panel; al cambiar, la hoja móvil se abre al menos a media altura. */
+function panelRevealKey(stopNumber: string | null, line: string | null, query: string): string | null {
+  const trimmedQuery = query.trim();
+  if (stopNumber === null && line === null && trimmedQuery === '') {
+    return null;
+  }
+  return `${stopNumber ?? ''}|${line ?? ''}|${trimmedQuery}`;
+}
+
+/** Estado raíz: consulta, línea, poste seleccionado (en el hash); compone el mapa a pantalla completa y el panel. */
+export default function ZaraBusApp({ panelFooter }: ZaraBusAppProps) {
   const [query, setQuery] = useState('');
   const [line, setLine] = useState<string | null>(null);
-  const [mapVisible, setMapVisible] = useState(false);
   const [highlight, setHighlight] = useState<HighlightState | null>(null);
   const deferredQuery = useDeferredValue(query);
+  const panelRef = useRef<HTMLElement>(null);
 
   const stopsState = useStops();
   const favorites = useFavorites();
@@ -45,18 +61,11 @@ export default function ZaraBusApp() {
   const arrivals = useArrivals(selectedStop);
   // La línea resaltada pertenece al poste en que se pulsó: al cerrarlo o cambiar de poste deja de valer.
   const highlightedLine = highlight !== null && highlight.stopNumber === stopNumber ? highlight.line : null;
-  const routeLine = pickRouteLine(line, highlightedLine);
-  const lineRoute = useLineRoute(routeLine);
+  const lineRoute = useLineRoute(pickRouteLine(line, highlightedLine));
   const lines = useMemo(() => listLines(stops), [stops]);
+  const mapStops = useMemo(() => stopsForLine(stops, line), [stops, line]);
   const results = useMemo(() => searchStops(stops, deferredQuery, line), [stops, deferredQuery, line]);
 
-  const selectStop = useCallback(
-    (stop: BusStop) => {
-      selectStopNumber(stop.number);
-      setMapVisible(false);
-    },
-    [selectStopNumber],
-  );
   const closeStopForSearch = useCallback(() => {
     if (stopNumber !== null) {
       selectStopNumber(null);
@@ -69,23 +78,15 @@ export default function ZaraBusApp() {
     },
     [closeStopForSearch],
   );
-  const changeLine = useCallback(
-    (nextLine: string | null) => {
-      closeStopForSearch();
-      setLine(nextLine);
-    },
-    [closeStopForSearch],
-  );
   const submitSearch = useCallback(
     (text: string) => {
       const exactStop = findStopByNumber(stops, text.trim());
       if (exactStop !== null) {
-        selectStop(exactStop);
+        selectStopNumber(exactStop.number);
       }
     },
-    [stops, selectStop],
+    [stops, selectStopNumber],
   );
-
   const toggleRoute = useCallback(
     (pressedLine: string) => {
       if (stopNumber !== null) {
@@ -94,71 +95,73 @@ export default function ZaraBusApp() {
     },
     [stopNumber, highlightedLine],
   );
+  const selectStop = useCallback((stop: BusStop) => selectStopNumber(stop.number), [selectStopNumber]);
+  const clearLineFilter = useCallback(() => setLine(null), []);
 
-  const headerSource =selectedStop === null ? stopsState : arrivals;
+  const headerSource = selectedStop === null ? stopsState : arrivals;
   const isSearching = query.trim() !== '' || line !== null;
 
+  const top = (
+    <>
+      <PanelHeader source={headerSource.source} fallbackReason={headerSource.fallbackReason} />
+      <SearchBox value={query} onChange={changeQuery} onSubmit={submitSearch} />
+      <LineFilter lines={lines} activeLine={line} onChange={setLine} />
+      <RouteNotice
+        line={pickRouteLine(line, highlightedLine)}
+        route={lineRoute.route}
+        loading={lineRoute.loading}
+        error={lineRoute.error}
+        fromFilter={line !== null}
+      />
+    </>
+  );
+
   return (
-    <div className="app-shell flex flex-col lg:flex-row">
-      <section
-        className={`flex min-h-0 flex-col lg:w-[420px] lg:flex-none lg:border-r lg:border-line ${
-          mapVisible ? 'flex-none' : 'flex-1'
-        }`}
-      >
-        <AppHeader
-          source={headerSource.source}
-          fallbackReason={headerSource.fallbackReason}
-          mapVisible={mapVisible}
-          onToggleMap={() => setMapVisible((visible) => !visible)}
-        />
-        <SearchBox value={query} onChange={changeQuery} onSubmit={submitSearch} />
-        <LineFilter lines={lines} activeLine={line} onChange={changeLine} />
-        <RouteNotice
-          line={routeLine}
-          route={lineRoute.route}
-          loading={lineRoute.loading}
-          error={lineRoute.error}
-          fromFilter={line !== null}
-        />
-        <div className={`min-h-0 flex-1 overflow-y-auto px-4 pb-6 ${mapVisible ? 'hidden lg:block' : ''}`}>
-          {selectedStop !== null ? (
-            <StopBoard
-              stop={selectedStop}
-              arrivals={arrivals.arrivals}
-              loading={arrivals.loading}
-              source={arrivals.source}
-              fallbackReason={arrivals.fallbackReason}
-              updatedAt={arrivals.updatedAt}
-              highlightedLine={highlightedLine}
-              onToggleRoute={toggleRoute}
-              isFavorite={favorites.isFavorite(selectedStop.id)}
-              onBack={() => selectStopNumber(null)}
-              onToggleFavorite={() => favorites.toggle(selectedStop.id)}
-              onRefresh={arrivals.refresh}
-            />
-          ) : isSearching ? (
-            <SearchResults results={results} loading={stopsState.loading} onSelect={selectStop} />
-          ) : (
-            <HomePanel
-              stops={stops}
-              favoriteIds={favorites.favorites}
-              position={geolocation.position}
-              geolocationStatus={geolocation.status}
-              onRequestLocation={geolocation.request}
-              onSelect={selectStop}
-            />
-          )}
-        </div>
-      </section>
-      <div className={`relative isolate min-h-0 lg:block lg:flex-1 ${mapVisible ? 'flex-1' : 'hidden'}`}>
+    <div className="relative h-dvh w-full overflow-hidden">
+      <div className="absolute inset-0 isolate">
         <BusMapLoader
-          stops={stops}
+          stops={mapStops}
           selectedStop={selectedStop}
           userPosition={geolocation.position}
+          lineFilter={line}
           route={lineRoute.route}
+          routeSettled={!lineRoute.loading}
+          panelRef={panelRef}
           onSelectStop={selectStop}
         />
       </div>
+      <AppPanel top={top} revealKey={panelRevealKey(stopNumber, line, query)} panelRef={panelRef}>
+        {selectedStop !== null ? (
+          <StopBoard
+            stop={selectedStop}
+            arrivals={arrivals.arrivals}
+            loading={arrivals.loading}
+            source={arrivals.source}
+            fallbackReason={arrivals.fallbackReason}
+            updatedAt={arrivals.updatedAt}
+            lineFilter={line}
+            highlightedLine={highlightedLine}
+            onToggleRoute={toggleRoute}
+            onClearLineFilter={clearLineFilter}
+            isFavorite={favorites.isFavorite(selectedStop.id)}
+            onBack={() => selectStopNumber(null)}
+            onToggleFavorite={() => favorites.toggle(selectedStop.id)}
+            onRefresh={arrivals.refresh}
+          />
+        ) : isSearching ? (
+          <SearchResults results={results} loading={stopsState.loading} onSelect={selectStop} />
+        ) : (
+          <HomePanel
+            stops={stops}
+            favoriteIds={favorites.favorites}
+            position={geolocation.position}
+            geolocationStatus={geolocation.status}
+            onRequestLocation={geolocation.request}
+            onSelect={selectStop}
+          />
+        )}
+        {panelFooter}
+      </AppPanel>
     </div>
   );
 }

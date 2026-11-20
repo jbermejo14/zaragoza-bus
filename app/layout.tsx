@@ -2,9 +2,8 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { Inter } from 'next/font/google';
 import './globals.css';
-import { Header } from '@/components/Header';
-import { Footer } from '@/components/Footer';
 import { getSiteUrl, SITE_NAME } from '@/lib/site';
+import { THEME_INIT_SCRIPT } from '@/lib/theme';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
 
@@ -33,12 +32,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="es" className={inter.variable}>
-      <body className="bg-surface font-sans text-ink antialiased">
-        <Header />
-        {children}
-        <Footer />
-      </body>
+    // suppressHydrationWarning: el script de <head> fija data-theme antes de que React hidrate.
+    <html lang="es" className={inter.variable} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
+      <body className="bg-surface font-sans text-ink antialiased">{children}</body>
     </html>
   );
 }

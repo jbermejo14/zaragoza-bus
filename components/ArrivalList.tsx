@@ -1,13 +1,18 @@
 import type { Arrival } from '../lib/types';
 import ArrivalRow from './ArrivalRow';
+import LineEmptyNotice from './LineEmptyNotice';
 
 interface ArrivalListProps {
+  /** Llegadas ya filtradas por la línea activa, si la hay. */
   arrivals: readonly Arrival[];
   /** True mientras se esperan los primeros datos del poste. */
   loading: boolean;
+  /** Línea del filtro activo (null = todas). */
+  lineFilter: string | null;
   /** Línea cuyo recorrido está resaltado desde esta lista (null = ninguna). */
   highlightedLine: string | null;
   onToggleRoute: (line: string) => void;
+  onClearLineFilter: () => void;
 }
 
 const SKELETON_ROW_COUNT = 3;
@@ -17,7 +22,14 @@ function arrivalKey(arrival: Arrival, index: number): string {
 }
 
 /** Llegadas del poste, con esqueleto al cargar y mensaje si no hay estimaciones. */
-export default function ArrivalList({ arrivals, loading, highlightedLine, onToggleRoute }: ArrivalListProps) {
+export default function ArrivalList({
+  arrivals,
+  loading,
+  lineFilter,
+  highlightedLine,
+  onToggleRoute,
+  onClearLineFilter,
+}: ArrivalListProps) {
   if (arrivals.length === 0 && loading) {
     return (
       <ul className="flex flex-col gap-2" aria-busy="true" aria-label="Cargando tiempos de paso">
@@ -26,6 +38,9 @@ export default function ArrivalList({ arrivals, loading, highlightedLine, onTogg
         ))}
       </ul>
     );
+  }
+  if (arrivals.length === 0 && lineFilter !== null) {
+    return <LineEmptyNotice line={lineFilter} onClearFilter={onClearLineFilter} />;
   }
   if (arrivals.length === 0) {
     return (

@@ -1,4 +1,5 @@
 import { Info } from 'lucide-react';
+import { arrivalsForLine } from '../lib/line-filter';
 import type { Arrival, BusStop, DataSource } from '../lib/types';
 import ArrivalList from './ArrivalList';
 import StopBoardHeader from './StopBoardHeader';
@@ -10,12 +11,15 @@ interface StopBoardProps {
   source: DataSource | null;
   fallbackReason?: string;
   updatedAt: Date | null;
+  /** Línea del filtro activo (null = todas): la marquesina solo muestra sus llegadas. */
+  lineFilter: string | null;
   highlightedLine: string | null;
   isFavorite: boolean;
   onBack: () => void;
   onToggleFavorite: () => void;
   onRefresh: () => void;
   onToggleRoute: (line: string) => void;
+  onClearLineFilter: () => void;
 }
 
 const DEMO_NOTICE = 'La API del Ayuntamiento no responde ahora mismo: se muestran tiempos simulados.';
@@ -28,12 +32,14 @@ export default function StopBoard({
   source,
   fallbackReason,
   updatedAt,
+  lineFilter,
   highlightedLine,
   isFavorite,
   onBack,
   onToggleFavorite,
   onRefresh,
   onToggleRoute,
+  onClearLineFilter,
 }: StopBoardProps) {
   return (
     <section aria-label={`Poste ${stop.number}`} className="flex flex-col gap-3">
@@ -53,10 +59,12 @@ export default function StopBoard({
         </p>
       )}
       <ArrivalList
-        arrivals={arrivals}
-        loading={loading}
+        arrivals={arrivalsForLine(arrivals, lineFilter)}
+        loading={loading && arrivals.length === 0}
+        lineFilter={lineFilter}
         highlightedLine={highlightedLine}
         onToggleRoute={onToggleRoute}
+        onClearLineFilter={onClearLineFilter}
       />
     </section>
   );

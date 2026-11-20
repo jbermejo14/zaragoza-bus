@@ -39,7 +39,7 @@ export default function SearchBox({ value, onChange, onSubmit }: SearchBoxProps)
             type="button"
             onClick={() => onChange('')}
             aria-label="Borrar búsqueda"
-            className="absolute top-1/2 right-2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-muted hover:text-accent"
+            className="absolute top-1/2 right-2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-muted hover:text-accent-text"
           >
             <X size={18} aria-hidden="true" />
           </button>

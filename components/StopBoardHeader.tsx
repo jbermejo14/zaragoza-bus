@@ -14,7 +14,7 @@ interface StopBoardHeaderProps {
 }
 
 const ICON_BUTTON_CLASSES =
-  'flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line bg-surface hover:border-accent hover:text-accent';
+  'flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line bg-surface hover:border-accent hover:text-accent-text';
 
 /** Cabecera de la marquesina: volver, número, nombre, favorito, refrescar y hora de actualización. */
 export default function StopBoardHeader({
@@ -44,7 +44,7 @@ export default function StopBoardHeader({
           <Star
             size={20}
             aria-hidden="true"
-            className={isFavorite ? 'fill-accent text-accent' : ''}
+            className={isFavorite ? 'fill-accent-text text-accent-text' : ''}
           />
         </button>
       </div>
@@ -54,7 +54,7 @@ export default function StopBoardHeader({
           type="button"
           onClick={onRefresh}
           aria-label="Refrescar tiempos de paso"
-          className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1 font-semibold text-ink hover:border-accent hover:text-accent"
+          className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1 font-semibold text-ink hover:border-accent hover:text-accent-text"
         >
           <RefreshCw size={14} aria-hidden="true" className={loading ? 'animate-spin' : ''} />
           Refrescar

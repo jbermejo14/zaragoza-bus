@@ -28,7 +28,7 @@ export default function ArrivalRow({ arrival, routeActive, onToggleRoute }: Arri
       </button>
       <span className="min-w-0 flex-1 line-clamp-2 break-words font-medium">{arrival.destination}</span>
       <span className="shrink-0 text-right">
-        <span className="block text-3xl font-bold tabular-nums text-accent">
+        <span className="block text-3xl font-bold tabular-nums text-accent-text">
           {formatMinutes(arrival.firstMinutes)}
         </span>
         <span className="block text-sm tabular-nums text-muted">

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import AboutSection from '@/components/AboutSection';
+import PanelFooter from '@/components/PanelFooter';
 import ZaraBusApp from '@/components/ZaraBusApp';
 import { absoluteUrl } from '@/lib/site';
 
@@ -10,8 +10,7 @@ export const metadata: Metadata = {
 export default function Page() {
   return (
     <main>
-      <ZaraBusApp />
-      <AboutSection />
+      <ZaraBusApp panelFooter={<PanelFooter />} />
     </main>
   );
 }

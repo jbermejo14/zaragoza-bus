@@ -5,18 +5,27 @@
 @import "leaflet/dist/leaflet.css" layer(base);
 @import "leaflet.markercluster/dist/MarkerCluster.css" layer(base);
 
+/* Variante `dark:` de Tailwind: se activa con data-theme="dark" en <html> (lo fija el script de layout.tsx). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /* ==========================================================================
    Ododex - Autobús de Zaragoza
-   Paleta blanca y roja de ZaraBus. Solo tema claro. Los colores se definen aquí
-   y los componentes los usan por nombre (bg-accent, text-muted...), nunca como hex.
+   Paleta roja de ZaraBus en dos temas. Los colores se definen aquí y los componentes los
+   usan por nombre (bg-accent, text-muted...), nunca como hex.
+   Tema claro: bloque @theme. Tema oscuro: bloque [data-theme="dark"] más abajo.
+   Reglas de contraste (AA, comprobadas en tests/ui-contrast.test.ts):
+   - text-ink, text-muted y text-accent-text sobre surface y card: mínimo 4,5.
+   - bg-accent y bg-accent-hover con texto blanco (text-white): mínimo 4,5.
+   `accent` es solo relleno; `accent-text` es el rojo para texto e iconos sobre surface/card.
    ========================================================================== */
 
-@theme {
+@theme static {
   --color-surface: #ffffff;
   --color-card: #f8fafc;
   --color-line: #e2e8f0;
   --color-accent: #dc2626;
   --color-accent-hover: #b91c1c;
+  --color-accent-text: #dc2626;
   --color-ink: #0f172a;
   --color-muted: #64748b;
   --color-live: #16a34a;
@@ -31,13 +40,32 @@
    en tiempo de ejecución (Leaflet los pinta como atributos SVG, que no admiten var()). */
 :root {
   --site-header-height: 3.5rem;
-  --app-min-height: 30rem;
   --map-stop-color: var(--color-accent);
-  --map-stop-border-color: var(--color-surface);
+  --map-stop-border-color: #ffffff;
+  --map-selected-color: #991b1b;
+  --map-route-color: #dc2626;
   --map-user-color: #2563eb;
   --radius-sm: 8px;
   --radius-md: 12px;
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Tema oscuro: debe ir después de :root para ganarle a los valores claros del mapa. */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-surface: #0f172a;
+  --color-card: #1e293b;
+  --color-line: #334155;
+  --color-accent: #dc2626;
+  --color-accent-hover: #b91c1c;
+  --color-accent-text: #f87171;
+  --color-ink: #f1f5f9;
+  --color-muted: #94a3b8;
+  --color-live: #22c55e;
+  --color-demo: #fbbf24;
+  --map-route-color: #f87171;
+  --map-selected-color: #fca5a5;
+  --map-user-color: #60a5fa;
 }
 
 *,
@@ -54,11 +82,11 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-accent-text);
   outline-offset: 2px;
 }
 
-/* Cabecera de Ododex: alto fijo para que la app pueda ocupar el resto de la pantalla. */
+/* Cabecera de Ododex (solo páginas legales y 404). */
 .site-header {
   background-color: var(--color-card);
   border-bottom: 1px solid var(--color-line);
@@ -106,13 +134,7 @@ body {
   color: var(--color-muted);
 }
 
-/* La app ocupa el alto visible bajo la cabecera de Ododex. */
-.app-shell {
-  height: calc(100dvh - var(--site-header-height));
-  min-height: var(--app-min-height);
-}
-
-/* Layout */
+/* Layout de las páginas con texto */
 .main-wrapper {
   max-width: 1240px;
   width: 100%;
@@ -121,23 +143,23 @@ body {
   flex: 1;
 }
 
+/* «Sobre este servicio» al final del panel. */
 .about-section {
-  max-width: 48rem;
-  margin: 0 auto;
-  padding: 2.5rem 1rem;
+  border-top: 1px solid var(--color-line);
+  padding-top: 1rem;
 }
 
 .about-section h2 {
-  font-size: 1.25rem;
+  font-size: 0.95rem;
   font-weight: 700;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
 .about-section p {
-  font-size: 0.95rem;
-  line-height: 1.65;
-  color: var(--color-ink);
-  margin-bottom: 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--color-muted);
+  margin-bottom: 0.5rem;
 }
 
 /* Cards */
@@ -174,6 +196,52 @@ body {
 .btn-secondary:hover {
   color: var(--color-ink);
   border-color: var(--color-accent);
+}
+
+/* Botón de tema: muestra la luna en tema claro y el sol en tema oscuro (por CSS, sin esperar a React). */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  border: 1px solid var(--color-line);
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.theme-toggle:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+.theme-toggle .theme-icon-sun {
+  display: none;
+}
+
+[data-theme="dark"] .theme-toggle .theme-icon-sun {
+  display: block;
+}
+
+[data-theme="dark"] .theme-toggle .theme-icon-moon {
+  display: none;
+}
+
+/* Logo de Ododex: dos imágenes y se muestra la del tema activo. */
+.brand-logo-dark {
+  display: none;
+}
+
+[data-theme="dark"] .brand-logo-light {
+  display: none;
+}
+
+[data-theme="dark"] .brand-logo-dark {
+  display: block;
 }
 
 /* Footer */
@@ -219,11 +287,25 @@ body {
 }
 
 .footer-legal a:hover {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .footer-subtext a {
   text-decoration: underline;
+}
+
+/* Pie de Ododex dentro del panel: mismo contenido que el pie de las páginas, alineado a la izquierda. */
+.panel-footer {
+  border-top: 1px solid var(--color-line);
+  padding-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  text-align: left;
+}
+
+.panel-footer .footer-legal {
+  justify-content: flex-start;
 }
 
 /* Páginas legales */
@@ -255,7 +337,7 @@ body {
 }
 
 .legal-text a {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   text-decoration: underline;
 }
 
@@ -301,11 +383,11 @@ body {
 }
 
 .breadcrumbs a:hover {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .breadcrumbs .current {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   font-weight: 600;
 }
 
@@ -353,15 +435,20 @@ body {
     font-family: inherit;
   }
 
+  /* Tema oscuro: oscurece solo las teselas (no marcadores ni recorrido) hasta un tono cercano a pizarra. */
+  [data-theme="dark"] .leaflet-tile-pane {
+    filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.3);
+  }
+
   /* Icono de agrupación: círculo rojo con el número en blanco. */
   .zb-cluster {
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 3px solid var(--color-surface);
+    border: 3px solid var(--map-stop-border-color);
     border-radius: 9999px;
-    background: var(--color-accent);
-    color: var(--color-surface);
+    background: var(--map-stop-color);
+    color: #ffffff;
     font-size: 13px;
     font-weight: 700;
     box-shadow: 0 1px 4px rgba(15, 23, 42, 0.35);
@@ -369,6 +456,49 @@ body {
 
   .stop-tooltip {
     font-weight: 600;
+    background: var(--color-card);
+    border-color: var(--color-line);
     color: var(--color-ink);
+  }
+
+  .stop-tooltip.leaflet-tooltip-top::before {
+    border-top-color: var(--color-card);
+  }
+
+  .stop-tooltip.leaflet-tooltip-bottom::before {
+    border-bottom-color: var(--color-card);
+  }
+
+  .stop-tooltip.leaflet-tooltip-left::before {
+    border-left-color: var(--color-card);
+  }
+
+  .stop-tooltip.leaflet-tooltip-right::before {
+    border-right-color: var(--color-card);
+  }
+
+  /* Controles de Leaflet con los colores del tema. */
+  .leaflet-bar a,
+  .leaflet-bar a:hover {
+    background-color: var(--color-card);
+    border-bottom-color: var(--color-line);
+    color: var(--color-ink);
+  }
+
+  .leaflet-bar a:hover {
+    color: var(--color-accent-text);
+  }
+
+  .leaflet-bar {
+    border-color: var(--color-line);
+  }
+
+  .leaflet-container .leaflet-control-attribution {
+    background: color-mix(in srgb, var(--color-surface) 80%, transparent);
+    color: var(--color-muted);
+  }
+
+  .leaflet-container .leaflet-control-attribution a {
+    color: var(--color-accent-text);
   }
 }
