@@ -286,6 +286,24 @@ Decisiones del titular (2026-11-19): paleta blanca y roja de ZaraBus (sin modo o
 - Páginas: `/aviso-legal`, `/privacidad`, `/cookies` (noindex, follow; datos del titular con `lib/legal.ts` y `config/titular.json`, que no va a git), `not-found.tsx` con cabecera y pie, `app/sitemap.ts` (`force-static`, solo la portada). Canonical y OpenGraph con `absoluteUrl`.
 - Pruebas copiadas y adaptadas de es-itv: site, legal, legal-pages, network, no-template-leftovers; sin las de AdSlot. Colores: tokens propios en `globals.css` (rojo), nunca hex sueltos en `.tsx`.
 
+## 4c. Rediseño v2 (2026-11-20): maqueta del tranvía, modo oscuro y filtro de línea
+
+Sustituye la maquetación de §4 y §4b (cabecera Ododex arriba + app debajo) y la decisión «sin modo oscuro». Referencia visual y de código: `../zaratram-live` (publicada en `/es/tranvia-zaragoza`), en concreto `components/AppPanel.tsx`, `PanelHeader.tsx`, `use-bottom-sheet.ts`, `bottom-sheet-math.ts`, `TramMap.tsx`/`tram-map-layers.ts`, `app/globals.css` (filtro de teselas oscuras) y su pie de panel con la marca Ododex.
+
+- **Maqueta**: el mapa ocupa toda la ventana (`100dvh`, sin cabecera de sitio). Encima, un panel flotante:
+  - Escritorio (≥ 1024 px): tarjeta a la izquierda con margen, esquinas redondeadas, sombra, ancho 400–420 px y alto completo menos márgenes, con scroll propio.
+  - Móvil: hoja inferior deslizable (bottom sheet) con asa, tres alturas (recogida mostrando buscador, media, casi completa) como el tranvía; arrastre táctil y con ratón, y el asa accesible con teclado. Sin botón «Mapa/Lista»: el mapa siempre está detrás.
+  - Contenido del panel, de arriba abajo: cabecera del panel (icono rojo de bus + «Autobús de Zaragoza» + subtítulo «Tiempos de paso en tiempo real», insignia En vivo/Demo, botón de tema), buscador, chips de línea, contenido (inicio / resultados / marquesina), «Sobre este servicio» y, al final, el pie Ododex dentro del panel (logo de Ododex según tema, descripción, fuentes y atribución OSM, enlaces legales, «Otras webs de Ododex»).
+  - Las páginas legales y la 404 mantienen cabecera y pie Ododex normales (con botón de tema).
+- **Tema claro/oscuro**: `data-theme="light"|"dark"` en `<html>`, script en `<head>` antes de pintar que lee `localStorage['ododex-theme']` y, si no hay, `prefers-color-scheme` (como las demás webs de la red: misma clave para que el tema se comparta en ododex.com). Botón sol/luna con `aria-label` que alterna y guarda. Tokens de color redefinidos para `[data-theme="dark"]` (fondo de panel oscuro tipo `#0F172A`/`#1E293B`, texto claro, bordes oscuros); el rojo de acento se mantiene (ajústalo, p. ej. `#EF4444`, si hace falta contraste AA sobre fondo oscuro). Contraste AA en ambos temas. Logos de Ododex claro/oscuro según tema.
+- **Mapa**: teselas OSM. En tema oscuro, `.leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.3); }` como el tranvía; en tema claro, teselas normales. Postes, clusters, selección y recorrido con colores leídos de variables CSS que cambian con el tema (los marcadores se recolorean al cambiar de tema sin recrear el mapa). Controles de zoom arriba a la derecha. En escritorio, encuadres (`fitBounds`, `setView`) con `paddingTopLeft` igual al ancho del panel para que nada quede tapado; en móvil, con relleno inferior igual a la altura de la hoja.
+- **Línea seleccionada** (chip activo): se muestra solo esa línea.
+  - Mapa: solo los postes cuyo `lines` incluye la línea (el resto se quita de la capa de clusters) y su recorrido.
+  - Lista: solo sus postes (ya lo hace `searchStops`).
+  - Marquesina: solo las llegadas de esa línea; si el poste no tiene esa línea o no hay llegadas de ella, mensaje «La línea N no tiene llegadas previstas en este poste» con un botón «Ver todas las líneas» que quita el filtro.
+  - Al abrir un poste con filtro activo el filtro se mantiene (ya no se cierra el poste al pulsar un chip: pulsar un chip con poste abierto filtra su marquesina).
+  - Lógica pura del filtrado (postes visibles, llegadas visibles) en `lib/line-filter.ts` con pruebas.
+
 ## 5. Criterios de aceptación
 
 - 3.1–3.8: pruebas en `tests/<módulo>.test.ts` que cubran la interfaz pública y los casos límite descritos. Sin red.
