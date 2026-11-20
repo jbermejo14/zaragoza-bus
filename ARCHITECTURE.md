@@ -393,4 +393,14 @@ Petición del titular: al pulsar una parada no deben verse paradas agrupadas; c�
 - **Autobuses a la vista**: al abrir un poste se centra en él como hoy; cuando llega la primera respuesta del GPS para ese poste, el mapa encuadra el poste y los autobuses más próximos (como mucho 3, por menor `arrivals[0].minutes`, respetando el filtro de línea) con `fitBounds`, el relleno del panel (`map-viewport`) y zoom máximo 17. Solo una vez por poste abierto: los refrescos posteriores no mueven la vista, para no pelear con el usuario. Sin autobuses, se queda en el poste.
 - **Icono de autobús más visible**: insignia con icono de bus y número de línea, más grande que hoy, con borde y sombra para que se distinga de los postes en ambos temas; tooltip como hoy.
 - Lógica pura nueva en `lib/vehicle-framing.ts`: `vehiclesToFrame(vehicles, line: string | null, limit): BusVehicle[]` y `framingPoints(stop, vehicles): Coordinates[]`, con pruebas.
-- Criterio: `npm test`, `npm run typecheck` y `npm run build` en verde; en el navegador, al abrir un poste se ven los postes cercanos sin grupos y los autobuses que llegan dentro de la vista, en claro y en oscuro, escritorio y 375 px.
+- Criterio (§4e): `npm test`, `npm run typecheck` y `npm run build` en verde; en el navegador, al abrir un poste se ven los postes cercanos sin grupos y los autobuses que llegan dentro de la vista, en claro y en oscuro, escritorio y 375 px.
+
+## 4f. Búsqueda por línea (2026-11-20)
+
+Petición del titular: buscar una línea por su nombre (Ci1, Ci2…): las circulares quedaban al final de la fila de chips, con scroll horizontal, y el buscador solo encontraba postes y calles.
+
+- `lib/stop-search.ts`: nueva `searchLines(lines: readonly string[], query: string, limit?: number): string[]` (por defecto 8). Normaliza la consulta: recorta, quita un prefijo «línea»/«linea»/«l.» con o sin espacio, quita espacios internos y compara sin distinguir mayúsculas. Coincidencia exacta primero; después las líneas que empiezan por la consulta, en el orden de `compareLines`. Consulta vacía tras normalizar → `[]`. Ejemplos: «ci» → Ci1, Ci2, Ci3, Ci4; «Ci1» → Ci1; «línea 24» → 24; «n» → N1…N7; «2» → 21, 22, 23… (como mucho 8); «goya» → [].
+- Resultados del buscador (`SearchResults`): si `searchLines(listLines(stops), query)` no está vacío, se muestra arriba un bloque «Líneas» con las insignias como botones (`aria-label` «Ver la línea N»); pulsar una activa el filtro de esa línea y vacía el buscador. Debajo, el bloque «Paradas» como hoy. Si no hay ni líneas ni paradas, «Sin resultados».
+- Fila de chips: además, las circulares (Ci…) van primero, porque son las más buscadas: el orden de los chips pasa a ser circulares, números, C…, N…, resto (función nueva `compareChipLines` o parámetro; `compareLines` no cambia para no romper otros usos).
+- Placeholder del buscador: «Nº de poste, calle o línea».
+- Pruebas en `tests/stop-search.test.ts` para `searchLines` y el orden de chips; prueba de componente para el bloque «Líneas» si es sencillo.
