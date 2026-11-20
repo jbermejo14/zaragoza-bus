@@ -76,6 +76,12 @@ test('parseStopVehicles rechaza autobús sin coche o sin línea', () => {
   assertFormatError({ autobuses: [validBus({ linea: '' })] }, /"linea"/);
 });
 
+test('parseStopVehicles acepta un destino vacío y rechaza uno no textual', () => {
+  assert.equal(parseStopVehicles({ autobuses: [validBus({ destino: '' })] }).vehicles[0].destination, '');
+  assertFormatError({ autobuses: [validBus({ destino: 5 })] }, /"destino"/);
+  assertFormatError({ autobuses: [validBus({ destino: null })] }, /"destino"/);
+});
+
 test('parseStopVehicles rechaza coordenadas ausentes o no finitas', () => {
   assertFormatError({ autobuses: [validBus({ latitud: undefined })] }, /latitud/);
   assertFormatError({ autobuses: [validBus({ longitud: '1' })] }, /longitud/);

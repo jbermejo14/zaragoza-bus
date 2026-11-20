@@ -63,6 +63,15 @@ function requireText(raw: Record<string, unknown>, field: string, where: string)
   return value;
 }
 
+/** El destino puede faltar o venir vacío; si existe, debe ser texto. */
+function parseDestination(value: unknown, where: string): string {
+  if (value === undefined) return '';
+  if (typeof value !== 'string') {
+    throw new VehiclesFormatError(`${where} tiene un campo "destino" que no es texto.`);
+  }
+  return value;
+}
+
 function parseVehicle(raw: unknown, index: number): BusVehicle {
   const where = `El autobús ${index}`;
   if (!isRecord(raw)) throw new VehiclesFormatError(`${where} no es un objeto.`);
@@ -73,7 +82,7 @@ function parseVehicle(raw: unknown, index: number): BusVehicle {
     vehicle: requireText(raw, 'coche', where),
     line: requireText(raw, 'linea', where),
     // El destino puede venir vacío; solo debe ser texto.
-    destination: typeof raw.destino === 'string' ? raw.destino : '',
+    destination: parseDestination(raw.destino, where),
     position: parseCoordinates(raw, where),
     arrivals: raw.llegadas.map((arrival) => parseArrival(arrival, where)),
   };
