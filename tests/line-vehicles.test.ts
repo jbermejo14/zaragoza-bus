@@ -4,7 +4,8 @@ import { describeFailure } from '../lib/bus-source';
 import type { FetchFunction } from '../lib/bus-source';
 import { LINE_VEHICLES_TIMEOUT_MS, REQUEST_TIMEOUT_MS, lineVehiclesProxyUrl } from '../lib/config';
 import { FormatError } from '../lib/format-error';
-import { LineVehiclesFormatError, fetchLineVehicles, parseLineVehicles, pickSampleStops } from '../lib/line-vehicles';
+import { LineVehiclesFormatError, fetchLineVehicles, mergeVehicles, parseLineVehicles, pickSampleStops, retainSeenVehicles } from '../lib/line-vehicles';
+import type { BusVehicle } from '../lib/bus-vehicles';
 import type { BusStop } from '../lib/types';
 
 function stopAt(number: string, longitude: number, latitude = 41.65): BusStop {
@@ -138,4 +139,40 @@ test('fetchLineVehicles espera hasta 30 s y aborta al cumplirse', async (context
   context.mock.timers.tick(LINE_VEHICLES_TIMEOUT_MS - REQUEST_TIMEOUT_MS);
   await settled;
   assert.equal(aborted, true);
+});
+
+function vehicleAt(vehicle: string, latitude: number, minutes?: number): BusVehicle {
+  return {
+    vehicle,
+    line: '25',
+    destination: 'LA CARTUJA',
+    position: { latitude, longitude: -0.9 },
+    arrivals: minutes === undefined ? [] : [{ minutes, km: 1 }],
+  };
+}
+
+test('mergeVehicles añade coches nuevos y actualiza los que ya estaban, conservando el orden', () => {
+  const previous = [vehicleAt('1', 41.6), vehicleAt('2', 41.61)];
+  const incoming = [vehicleAt('3', 41.63), vehicleAt('1', 41.62)];
+  const merged = mergeVehicles(previous, incoming);
+  assert.deepEqual(merged.map((vehicle) => vehicle.vehicle), ['1', '2', '3']);
+  assert.equal(merged[0].position.latitude, 41.62);
+});
+
+test('mergeVehicles prioriza los datos entrantes (con minutos) y no altera las entradas', () => {
+  const previous = [vehicleAt('1', 41.6)];
+  const merged = mergeVehicles(previous, [vehicleAt('1', 41.6, 7)]);
+  assert.deepEqual(merged[0].arrivals, [{ minutes: 7, km: 1 }]);
+  assert.deepEqual(previous[0].arrivals, []);
+});
+
+test('mergeVehicles con listas vacías', () => {
+  assert.deepEqual(mergeVehicles([], []), []);
+  assert.equal(mergeVehicles([vehicleAt('1', 41.6)], []).length, 1);
+});
+
+test('retainSeenVehicles quita los coches no vistos', () => {
+  const vehicles = [vehicleAt('1', 41.6), vehicleAt('2', 41.61)];
+  assert.deepEqual(retainSeenVehicles(vehicles, new Set(['2'])).map((vehicle) => vehicle.vehicle), ['2']);
+  assert.deepEqual(retainSeenVehicles(vehicles, new Set()), []);
 });

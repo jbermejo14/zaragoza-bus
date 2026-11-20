@@ -11,11 +11,17 @@ test('aviso de autobuses de la línea: plural, singular y ninguno', () => {
 });
 
 test('LineVehiclesNotice no pinta nada sin línea o sin dato (cargando o fallo)', () => {
-  assert.equal(renderToStaticMarkup(<LineVehiclesNotice line={null} count={3} />), '');
-  assert.equal(renderToStaticMarkup(<LineVehiclesNotice line="25" count={null} />), '');
+  assert.equal(renderToStaticMarkup(<LineVehiclesNotice line={null} count={3} complete />), '');
+  assert.equal(renderToStaticMarkup(<LineVehiclesNotice line="25" count={null} complete />), '');
 });
 
 test('LineVehiclesNotice muestra el recuento con una línea y datos', () => {
-  const html = renderToStaticMarkup(<LineVehiclesNotice line="25" count={4} />);
+  const html = renderToStaticMarkup(<LineVehiclesNotice line="25" count={4} complete={false} />);
   assert.ok(html.includes('4 autobuses de la línea 25 en servicio ahora'));
+});
+
+test('LineVehiclesNotice no dice que no hay autobuses hasta que responden todas las paradas', () => {
+  assert.equal(renderToStaticMarkup(<LineVehiclesNotice line="25" count={0} complete={false} />), '');
+  const html = renderToStaticMarkup(<LineVehiclesNotice line="25" count={0} complete />);
+  assert.ok(html.includes('No hay autobuses de la línea 25 en servicio ahora'));
 });

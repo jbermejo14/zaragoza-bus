@@ -5,6 +5,8 @@ interface LineVehiclesNoticeProps {
   line: string | null;
   /** Autobuses de la línea en servicio; null = aún no se sabe (cargando por primera vez o fallo). */
   count: number | null;
+  /** Han respondido todas las paradas consultadas; hasta entonces no se afirma que no hay autobuses. */
+  complete: boolean;
 }
 
 const NOTICE_CLASSES = 'flex items-start gap-1.5 px-4 pb-2 text-xs text-muted';
@@ -18,9 +20,9 @@ export function lineVehiclesNoticeText(line: string, count: number): string {
   return `${count} ${noun} de la línea ${line} en servicio ahora`;
 }
 
-/** Aviso discreto con cuántos autobuses de la línea seleccionada circulan; nada si no se sabe. */
-export default function LineVehiclesNotice({ line, count }: LineVehiclesNoticeProps) {
-  if (line === null || count === null) {
+/** Aviso discreto con cuántos autobuses de la línea seleccionada circulan; nada si no se sabe ni, sin autobuses, mientras sigan respondiendo paradas. */
+export default function LineVehiclesNotice({ line, count, complete }: LineVehiclesNoticeProps) {
+  if (line === null || count === null || (count === 0 && !complete)) {
     return null;
   }
   return (

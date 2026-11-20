@@ -3,14 +3,14 @@ import { cleanDestination } from '../lib/arrivals-parser';
 import type { BusVehicle, VehicleArrival } from '../lib/bus-vehicles';
 
 const ARRIVAL_SEPARATOR = ' / ';
-const VEHICLE_ICON_WIDTH_PX = 58;
-const VEHICLE_ICON_HEIGHT_PX = 30;
+/** Diámetro del círculo del icono, borde incluido (el CSS usa borde de 3 px con `box-sizing: border-box`). */
+const VEHICLE_ICON_SIZE_PX = 34;
 
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
-const BUS_GLYPH_SIZE_PX = 18;
+const BUS_GLYPH_SIZE_PX = 20;
 const BUS_GLYPH_VIEW_BOX = '0 0 24 24';
 const BUS_GLYPH_STROKE_WIDTH = '2.2';
-/** Silueta de autobús (icono «Bus» de lucide, licencia ISC) dibujada con trazos del color del texto. */
+/** Silueta de autobús (icono «Bus» de lucide, licencia ISC) dibujada con trazos del color del texto (blanco). */
 const BUS_GLYPH_PATHS = [
   'M8 6v6',
   'M15 6v6',
@@ -77,20 +77,18 @@ function busGlyph(): SVGSVGElement {
   return svg;
 }
 
-/** Insignia: icono de autobús y número de línea; es el elemento con `role="img"` y la descripción completa. */
-function vehicleBadge(vehicle: BusVehicle, description: string): HTMLSpanElement {
+/** Insignia: solo el icono de autobús; es el elemento con  y la descripción completa. */
+function vehicleBadge(description: string): HTMLSpanElement {
   const badge = document.createElement('span');
   badge.className = 'zb-bus-badge';
   badge.setAttribute('role', 'img');
   badge.setAttribute('aria-label', description);
-  const line = textElement(vehicle.line);
-  line.className = 'zb-bus-line';
-  badge.append(busGlyph(), line);
+  badge.append(busGlyph());
   return badge;
 }
 
 /**
- * Marcador de un autobús: insignia con icono y número de línea (estilos `.zb-bus` en globals.css, que
+ * Marcador de un autobús: círculo con el icono de autobús (estilos `.zb-bus` en globals.css, que
  * cambian con el tema) y tooltip con sus datos. Recibe Leaflet como parámetro (y no importa
  * bus-map-layers) para que este módulo se pueda probar en Node, donde Leaflet no carga.
  * Todo el texto va como nodos de texto, nunca como HTML.
@@ -98,9 +96,9 @@ function vehicleBadge(vehicle: BusVehicle, description: string): HTMLSpanElement
 export function createVehicleMarker(leaflet: typeof Leaflet, vehicle: BusVehicle): Leaflet.Marker {
   const description = vehicleTooltipText(vehicle);
   const icon = leaflet.divIcon({
-    html: vehicleBadge(vehicle, description),
+    html: vehicleBadge(description),
     className: 'zb-bus',
-    iconSize: leaflet.point(VEHICLE_ICON_WIDTH_PX, VEHICLE_ICON_HEIGHT_PX),
+    iconSize: leaflet.point(VEHICLE_ICON_SIZE_PX, VEHICLE_ICON_SIZE_PX),
   });
   const marker = leaflet.marker([vehicle.position.latitude, vehicle.position.longitude], {
     icon,

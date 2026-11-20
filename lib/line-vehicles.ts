@@ -121,3 +121,19 @@ export function pickSampleStops(stops: readonly BusStop[], count: number): BusSt
   }
   return picked;
 }
+
+/**
+ * Une dos listas de autobuses por coche: los de `incoming` sustituyen a los de `previous` con el mismo
+ * coche (posición y datos nuevos) y los coches nuevos se añaden al final. Conserva el orden de `previous`.
+ */
+export function mergeVehicles(previous: readonly BusVehicle[], incoming: readonly BusVehicle[]): BusVehicle[] {
+  const byVehicle = new Map<string, BusVehicle>();
+  previous.forEach((vehicle) => byVehicle.set(vehicle.vehicle, vehicle));
+  incoming.forEach((vehicle) => byVehicle.set(vehicle.vehicle, vehicle));
+  return [...byVehicle.values()];
+}
+
+/** Deja solo los autobuses cuyo coche está en `seenVehicles` (los vistos en un refresco completo). */
+export function retainSeenVehicles(vehicles: readonly BusVehicle[], seenVehicles: ReadonlySet<string>): BusVehicle[] {
+  return vehicles.filter((vehicle) => seenVehicles.has(vehicle.vehicle));
+}

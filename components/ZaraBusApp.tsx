@@ -5,6 +5,7 @@ import { stopsForLine, visibleVehicles } from '../lib/line-filter';
 import { findStopByNumber, listLines, searchLines, searchStops } from '../lib/stop-search';
 import { pickRouteLine, toggleHighlightedLine } from '../lib/route-line';
 import type { BusVehicle } from '../lib/bus-vehicles';
+import { mergeVehicles } from '../lib/line-vehicles';
 import type { BusStop } from '../lib/types';
 import { useArrivals } from '../lib/use-arrivals';
 import { useFavorites } from '../lib/use-favorites';
@@ -47,19 +48,18 @@ function panelRevealKey(stopNumber: string | null, line: string | null, query: s
 const NO_VEHICLES: readonly BusVehicle[] = [];
 
 /**
- * Autobuses que dibuja el mapa: con poste abierto, los que se acercan a él (con minutos, filtrados por línea);
- * sin poste y con línea, todos los de la línea; en otro caso, ninguno.
+ * Autobuses que dibuja el mapa. Con línea: todos los de la línea y, unidos por coche con prioridad de los datos
+ * del poste, los que van al poste abierto (con minutos). Sin línea: los que van al poste abierto, o ninguno.
  */
 function vehiclesToDraw(
-  hasSelectedStop: boolean,
   stopVehicles: readonly BusVehicle[],
   lineVehicles: readonly BusVehicle[] | null,
   line: string | null,
 ): readonly BusVehicle[] {
-  if (hasSelectedStop) {
-    return visibleVehicles(stopVehicles, line);
+  if (line === null) {
+    return stopVehicles;
   }
-  return lineVehicles ?? NO_VEHICLES;
+  return mergeVehicles(lineVehicles ?? NO_VEHICLES, visibleVehicles(stopVehicles, line));
 }
 
 /** Estado raíz: consulta, línea, poste seleccionado (en el hash); compone el mapa a pantalla completa y el panel. */
@@ -90,8 +90,8 @@ export default function ZaraBusApp({ panelFooter }: ZaraBusAppProps) {
   const mapStops = useMemo(() => stopsForLine(stops, line), [stops, line]);
   const lineVehicles = useLineVehicles(line, mapStops);
   const vehicles = useMemo(
-    () => vehiclesToDraw(selectedStop !== null, allVehicles, lineVehicles, line),
-    [selectedStop, allVehicles, lineVehicles, line],
+    () => vehiclesToDraw(allVehicles, lineVehicles.vehicles, line),
+    [allVehicles, lineVehicles.vehicles, line],
   );
   const matchedLines = useMemo(() => searchLines(lines, deferredQuery), [lines, deferredQuery]);
   const results = useMemo(() => searchStops(stops, deferredQuery, line), [stops, deferredQuery, line]);
@@ -146,7 +146,11 @@ export default function ZaraBusApp({ panelFooter }: ZaraBusAppProps) {
         unavailable={lineRoute.unavailable}
         error={lineRoute.error}
       />
-      <LineVehiclesNotice line={line} count={lineVehicles === null ? null : lineVehicles.length} />
+      <LineVehiclesNotice
+        line={line}
+        count={lineVehicles.vehicles === null ? null : lineVehicles.vehicles.length}
+        complete={lineVehicles.complete}
+      />
     </>
   );
 

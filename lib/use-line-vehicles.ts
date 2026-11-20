@@ -3,11 +3,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { BusVehicle } from './bus-vehicles';
 import { AUTO_REFRESH_INTERVAL_MS } from './config';
-import { fetchLineVehicles, pickSampleStops } from './line-vehicles';
+import { fetchLineVehicles, mergeVehicles, pickSampleStops, retainSeenVehicles } from './line-vehicles';
 import type { BusStop } from './types';
 
 /** Paradas de la línea que se consultan: bastan para ver prácticamente todos sus autobuses. */
 export const LINE_SAMPLE_STOP_COUNT = 8;
+
+/** Consultas a la vez: el GPS de Avanza es lento y el Worker ya limita las suyas. */
+export const LINE_SAMPLE_CONCURRENCY = 4;
 
 const STOP_NUMBER_SEPARATOR = ',';
 
@@ -15,17 +18,42 @@ interface LineVehiclesState {
   /** Línea a la que pertenece el resultado; sirve para descartar datos de una línea anterior. */
   line: string | null;
   vehicles: BusVehicle[];
+  /** Ha respondido alguna parada con éxito: antes de eso no se sabe si hay autobuses. */
+  hasData: boolean;
+  /** La primera ronda de consultas de esta línea ha terminado (con éxito o no). */
+  complete: boolean;
 }
 
-const EMPTY_STATE: LineVehiclesState = { line: null, vehicles: [] };
+const EMPTY_STATE: LineVehiclesState = { line: null, vehicles: [], hasData: false, complete: false };
+
+/** Resultado del hook: autobuses conocidos (null si no se sabe) y si ya han respondido todas las paradas. */
+export interface LineVehiclesResult {
+  vehicles: BusVehicle[] | null;
+  /** Falso mientras la primera ronda sigue en curso: aún pueden aparecer más autobuses. */
+  complete: boolean;
+}
+
+const UNKNOWN_RESULT: LineVehiclesResult = { vehicles: null, complete: false };
+
+function addVehicles(previous: LineVehiclesState, line: string, incoming: BusVehicle[]): LineVehiclesState {
+  const base = previous.line === line ? previous : { ...EMPTY_STATE, line };
+  return { ...base, vehicles: mergeVehicles(base.vehicles, incoming), hasData: true };
+}
+
+function finishRound(previous: LineVehiclesState, line: string, seen: ReadonlySet<string> | null): LineVehiclesState {
+  const base = previous.line === line ? previous : { ...EMPTY_STATE, line };
+  // Sin ninguna respuesta (fallo total) se conserva lo anterior en vez de vaciar el mapa.
+  const vehicles = seen === null ? base.vehicles : retainSeenVehicles(base.vehicles, seen);
+  return { ...base, vehicles, complete: true };
+}
 
 /**
- * Todos los autobuses de la línea dada (null = ninguna), consultando unas paradas repartidas por
- * ella. Se refresca cada 30 s, en pausa con la pestaña oculta y al volver a verla si ha pasado el
- * intervalo. Devuelve `null` mientras carga por primera vez o si falla (sin datos demo ni error
- * visible); un fallo puntual conserva las posiciones anteriores de la misma línea.
+ * Todos los autobuses de la línea dada (null = ninguna). Pide una parada de muestra por petición, como
+ * mucho `LINE_SAMPLE_CONCURRENCY` a la vez, y va uniendo por coche según llegan. Se refresca cada 30 s
+ * partiendo de la lista anterior: al acabar el refresco se quitan los coches que no apareció en ninguna
+ * respuesta. En pausa con la pestaña oculta. Sin datos demo ni error visible si falla.
  */
-export function useLineVehicles(line: string | null, stops: readonly BusStop[]): BusVehicle[] | null {
+export function useLineVehicles(line: string | null, stops: readonly BusStop[]): LineVehiclesResult {
   const [state, setState] = useState<LineVehiclesState>(EMPTY_STATE);
   const sampleKey = useMemo(
     () => pickSampleStops(stops, LINE_SAMPLE_STOP_COUNT).map((stop) => stop.number).join(STOP_NUMBER_SEPARATOR),
@@ -38,39 +66,55 @@ export function useLineVehicles(line: string | null, stops: readonly BusStop[]):
     }
     const stopNumbers = sampleKey.split(STOP_NUMBER_SEPARATOR);
     let cancelled = false;
-    let requestCounter = 0;
+    let roundCounter = 0;
     let lastLoadAt = 0;
 
-    const load = () => {
-      requestCounter += 1;
-      const requestId = requestCounter;
+    const runRound = async () => {
+      roundCounter += 1;
+      const roundId = roundCounter;
       lastLoadAt = Date.now();
-      fetchLineVehicles(line, stopNumbers, (url, init) => fetch(url, init))
-        .catch((error: unknown) => {
-          console.warn('No se pudieron cargar los autobuses de la línea', error);
-          return null;
-        })
-        .then((vehicles) => {
-          // Solo vale la última petición de la línea activa: las anteriores llegan tarde.
-          if (cancelled || requestId !== requestCounter || vehicles === null) {
-            return;
+      const isCurrent = () => !cancelled && roundId === roundCounter;
+      const seen = new Set<string>();
+      let answeredStops = 0;
+      let nextIndex = 0;
+
+      const worker = async () => {
+        while (isCurrent() && nextIndex < stopNumbers.length) {
+          const stopNumber = stopNumbers[nextIndex];
+          nextIndex += 1;
+          try {
+            const incoming = await fetchLineVehicles(line, [stopNumber], (url, init) => fetch(url, init));
+            if (isCurrent()) {
+              answeredStops += 1;
+              incoming.forEach((vehicle) => seen.add(vehicle.vehicle));
+              setState((previous) => addVehicles(previous, line, incoming));
+            }
+          } catch (error) {
+            // Una parada lenta o caída no debe tirar el resto de la ronda: se avisa en consola y se sigue.
+            console.warn('No se pudieron cargar los autobuses de la línea desde un poste', error);
           }
-          setState({ line, vehicles });
-        });
+        }
+      };
+
+      const workerCount = Math.min(LINE_SAMPLE_CONCURRENCY, stopNumbers.length);
+      await Promise.all(Array.from({ length: workerCount }, worker));
+      if (isCurrent()) {
+        setState((previous) => finishRound(previous, line, answeredStops > 0 ? seen : null));
+      }
     };
 
     const refreshIfVisible = () => {
       if (!document.hidden) {
-        load();
+        void runRound();
       }
     };
     const handleVisibility = () => {
       if (!document.hidden && Date.now() - lastLoadAt > AUTO_REFRESH_INTERVAL_MS) {
-        load();
+        void runRound();
       }
     };
 
-    load();
+    void runRound();
     const intervalId = setInterval(refreshIfVisible, AUTO_REFRESH_INTERVAL_MS);
     document.addEventListener('visibilitychange', handleVisibility);
     return () => {
@@ -80,5 +124,8 @@ export function useLineVehicles(line: string | null, stops: readonly BusStop[]):
     };
   }, [line, sampleKey]);
 
-  return line !== null && state.line === line ? state.vehicles : null;
+  if (line === null || state.line !== line) {
+    return UNKNOWN_RESULT;
+  }
+  return { vehicles: state.hasData ? state.vehicles : null, complete: state.complete };
 }

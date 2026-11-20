@@ -44,9 +44,9 @@
   --map-selected-color: #991b1b;
   --map-route-color: #dc2626;
   --map-user-color: #2563eb;
-  --map-bus-color: #1e293b;
+  --map-bus-color: var(--color-accent);
   --map-bus-text-color: #ffffff;
-  --map-bus-border-color: #ffffff;
+  --map-bus-border-color: var(--color-surface);
   --radius-sm: 8px;
   --radius-md: 12px;
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -68,9 +68,9 @@
   --map-route-color: #f87171;
   --map-selected-color: #fca5a5;
   --map-user-color: #60a5fa;
-  --map-bus-color: #f1f5f9;
-  --map-bus-text-color: #0f172a;
-  --map-bus-border-color: #0f172a;
+  --map-bus-color: var(--color-accent);
+  --map-bus-text-color: #ffffff;
+  --map-bus-border-color: var(--color-surface);
 }
 
 *,
@@ -440,33 +440,23 @@ body {
     box-shadow: 0 1px 4px rgba(15, 23, 42, 0.35);
   }
 
-  /* Autobús con GPS: insignia redondeada con icono de bus y número de línea, en los colores del tema. */
+  /* Autobús con GPS: círculo de 34 px del color de acento con el glifo de bus blanco; el borde es del color de fondo. */
   .zb-bus {
     display: flex;
     align-items: center;
     justify-content: center;
+    box-sizing: border-box;
     border: 3px solid var(--map-bus-border-color);
-    border-radius: 9px;
+    border-radius: 9999px;
     background: var(--map-bus-color);
     color: var(--map-bus-text-color);
-    font-size: 14px;
-    font-weight: 800;
-    box-shadow: 0 0 0 1px var(--map-bus-color), 0 3px 8px rgba(15, 23, 42, 0.5);
-    /* Líneas largas (p. ej. «CI12»): la insignia crece en vez de desbordar. */
-    min-width: 58px;
-    width: auto !important;
-    padding: 0 6px;
-    white-space: nowrap;
+    box-shadow: 0 3px 8px rgba(15, 23, 42, 0.5);
   }
 
   .zb-bus-badge {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-  }
-
-  .zb-bus-line {
-    line-height: 1;
+    justify-content: center;
   }
 
   .stop-tooltip {

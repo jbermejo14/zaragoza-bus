@@ -191,7 +191,9 @@ export default function BusMap({
     if (selectedStop === null || framedStopRef.current === selectedStop.number) {
       return;
     }
-    const nearest = vehiclesToFrame(vehicles, lineFilter, FRAME_MAX_VEHICLES);
+    // Con línea seleccionada también hay autobuses sin llegadas (los de la línea): solo cuentan los que van al poste.
+    const approaching = vehicles.filter((vehicle) => vehicle.arrivals.length > 0);
+    const nearest = vehiclesToFrame(approaching, lineFilter, FRAME_MAX_VEHICLES);
     if (nearest.length === 0) {
       return;
     }
