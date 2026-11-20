@@ -64,9 +64,13 @@ async function readJsonBody(response: Response): Promise<unknown> {
 }
 
 /** Pide una URL con tiempo límite y devuelve el JSON; el temporizador se limpia siempre. */
-export async function requestJson(fetchFn: FetchFunction, url: string): Promise<unknown> {
+export async function requestJson(
+  fetchFn: FetchFunction,
+  url: string,
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
+): Promise<unknown> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetchFn(url, { signal: controller.signal });
     const body = await readJsonBody(response);

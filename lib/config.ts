@@ -28,6 +28,15 @@ export function vehiclesProxyUrl(stopNumber: string): string {
   return `${VEHICLES_PROXY_PREFIX}${encodeURIComponent(stopNumber)}`;
 }
 
+/** Prefijo del proxy de autobuses de una línea: debe coincidir con la ruta `/api/gps-linea/` del Worker ododex-zaragoza-bus. */
+export const LINE_VEHICLES_PROXY_PREFIX = '/es/zaragoza-bus/api/gps-linea/';
+
+/** URL (relativa al sitio) de todos los autobuses de una línea, consultando los postes dados (separados por comas). */
+export function lineVehiclesProxyUrl(line: string, stopNumbers: readonly string[]): string {
+  const stops = stopNumbers.map((stopNumber) => encodeURIComponent(stopNumber)).join(',');
+  return `${LINE_VEHICLES_PROXY_PREFIX}${encodeURIComponent(line)}?postes=${stops}`;
+}
+
 /** URL del trazado de una línea (geometría oficial publicada en 2013). */
 export function lineRouteUrl(line: string): string {
   return `${TRANSPORT_API_BASE}/linea-autobus/${encodeURIComponent(line)}.json?srsname=wgs84`;
@@ -37,6 +46,8 @@ export function lineRouteUrl(line: string): string {
 export const URBAN_STOP_ID_PREFIX = 'tuzsa-';
 
 export const REQUEST_TIMEOUT_MS = 8000;
+/** El GPS de Avanza tarda de 3 a 11 s por poste y el Worker consulta hasta 8 con cola de 4 a la vez. */
+export const LINE_VEHICLES_TIMEOUT_MS = 30_000;
 export const AUTO_REFRESH_INTERVAL_MS = 30_000;
 
 export const SEARCH_RESULT_LIMIT = 30;

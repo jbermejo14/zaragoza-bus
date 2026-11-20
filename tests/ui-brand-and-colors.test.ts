@@ -114,6 +114,5 @@ test('tema: el botón alterna el tema con aria-label y los logos de Ododex tiene
 test('leaflet: su CSS va en la capa base para que las utilidades de Tailwind ganen', () => {
   const css = uiRead(GLOBALS_CSS);
   assert.ok(css.includes('@import "leaflet/dist/leaflet.css" layer(base);'));
-  assert.ok(css.includes('@import "leaflet.markercluster/dist/MarkerCluster.css" layer(base);'));
   assert.ok(!uiRead('app', 'layout.tsx').includes('leaflet'), 'layout.tsx no debe importar el CSS de Leaflet fuera de capa');
 });

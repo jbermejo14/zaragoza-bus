@@ -1,7 +1,7 @@
 import type * as Leaflet from 'leaflet';
 import { CITY_CENTER, MAP_ATTRIBUTION, MAP_DEFAULT_ZOOM, MAP_TILE_URL } from '../lib/config';
 import type { BusStop, Coordinates } from '../lib/types';
-import { L } from './leaflet-with-clusters';
+import * as L from 'leaflet';
 import type { MapColors } from './map-colors';
 import { computeFitPadding, hasUsableSpace, type PanelCover } from './map-viewport';
 import { VEHICLE_PANE, VEHICLE_PANE_Z_INDEX } from './vehicle-layer';
@@ -23,10 +23,8 @@ const STOP_BORDER_WEIGHT = 2.5;
 /** Anillo rojo grueso del seleccionado (su centro es del color de fondo del tema). */
 const SELECTED_BORDER_WEIGHT = 6;
 const FILL_OPACITY = 1;
-const CLUSTER_ICON_SIZE_PX = 44;
 /** Margen extra de toque (px) de los postes en canvas, donde no hay un círculo SVG que pulsar. */
 const STOP_CANVAS_TOLERANCE_PX = 8;
-const CLUSTER_MAX_RADIUS_PX = 50;
 const MAP_MAX_ZOOM = 19;
 
 /** Autobuses que se encuadran junto al poste al abrirlo. */
@@ -47,19 +45,6 @@ export function createBaseMap(container: HTMLElement): Leaflet.Map {
   map.createPane(SELECTED_PANE).style.zIndex = String(SELECTED_PANE_Z_INDEX);
   map.createPane(VEHICLE_PANE).style.zIndex = String(VEHICLE_PANE_Z_INDEX);
   return map;
-}
-
-export function createClusterGroup(): Leaflet.MarkerClusterGroup {
-  return L.markerClusterGroup({
-    maxClusterRadius: CLUSTER_MAX_RADIUS_PX,
-    showCoverageOnHover: false,
-    iconCreateFunction: (cluster) =>
-      L.divIcon({
-        html: `<span>${cluster.getChildCount()}</span>`,
-        className: 'zb-cluster',
-        iconSize: L.point(CLUSTER_ICON_SIZE_PX, CLUSTER_ICON_SIZE_PX),
-      }),
-  });
 }
 
 /** Renderizador canvas para los postes sin agrupar: ~1000 círculos pesarían mucho como SVG. */

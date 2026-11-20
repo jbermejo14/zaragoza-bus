@@ -1,9 +1,8 @@
 @import "tailwindcss";
 
-/* CSS de Leaflet y markercluster en la capa base: sin capa, sus reglas ganan a las
+/* CSS de Leaflet en la capa base: sin capa, sus reglas ganan a las
    utilidades de Tailwind (h-full, inset-0...) y el mapa puede quedar sin alto. */
 @import "leaflet/dist/leaflet.css" layer(base);
-@import "leaflet.markercluster/dist/MarkerCluster.css" layer(base);
 
 /* Variante `dark:` de Tailwind: se activa con data-theme="dark" en <html> (lo fija el script de layout.tsx). */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));

@@ -4,17 +4,20 @@ import { useCallback, useDeferredValue, useMemo, useRef, useState, type ReactNod
 import { stopsForLine, visibleVehicles } from '../lib/line-filter';
 import { findStopByNumber, listLines, searchLines, searchStops } from '../lib/stop-search';
 import { pickRouteLine, toggleHighlightedLine } from '../lib/route-line';
+import type { BusVehicle } from '../lib/bus-vehicles';
 import type { BusStop } from '../lib/types';
 import { useArrivals } from '../lib/use-arrivals';
 import { useFavorites } from '../lib/use-favorites';
 import { useGeolocation } from '../lib/use-geolocation';
 import { useLineRoute } from '../lib/use-line-route';
+import { useLineVehicles } from '../lib/use-line-vehicles';
 import { useVehicles } from '../lib/use-vehicles';
 import { useStopHash } from '../lib/use-stop-hash';
 import { useStops } from '../lib/use-stops';
 import AppPanel from './AppPanel';
 import BusMapLoader from './BusMapLoader';
 import HomePanel from './HomePanel';
+import LineVehiclesNotice from './LineVehiclesNotice';
 import LineFilter from './LineFilter';
 import PanelHeader from './PanelHeader';
 import RouteNotice from './RouteNotice';
@@ -41,6 +44,24 @@ function panelRevealKey(stopNumber: string | null, line: string | null, query: s
   return `${stopNumber ?? ''}|${line ?? ''}|${trimmedQuery}`;
 }
 
+const NO_VEHICLES: readonly BusVehicle[] = [];
+
+/**
+ * Autobuses que dibuja el mapa: con poste abierto, los que se acercan a él (con minutos, filtrados por línea);
+ * sin poste y con línea, todos los de la línea; en otro caso, ninguno.
+ */
+function vehiclesToDraw(
+  hasSelectedStop: boolean,
+  stopVehicles: readonly BusVehicle[],
+  lineVehicles: readonly BusVehicle[] | null,
+  line: string | null,
+): readonly BusVehicle[] {
+  if (hasSelectedStop) {
+    return visibleVehicles(stopVehicles, line);
+  }
+  return lineVehicles ?? NO_VEHICLES;
+}
+
 /** Estado raíz: consulta, línea, poste seleccionado (en el hash); compone el mapa a pantalla completa y el panel. */
 export default function ZaraBusApp({ panelFooter }: ZaraBusAppProps) {
   const [query, setQuery] = useState('');
@@ -64,9 +85,14 @@ export default function ZaraBusApp({ panelFooter }: ZaraBusAppProps) {
   // La línea resaltada pertenece al poste en que se pulsó: al cerrarlo o cambiar de poste deja de valer.
   const highlightedLine = highlight !== null && highlight.stopNumber === stopNumber ? highlight.line : null;
   const lineRoute = useLineRoute(pickRouteLine(line, highlightedLine));
-  const vehicles = useMemo(() => visibleVehicles(allVehicles, line), [allVehicles, line]);
+  
   const lines = useMemo(() => listLines(stops), [stops]);
   const mapStops = useMemo(() => stopsForLine(stops, line), [stops, line]);
+  const lineVehicles = useLineVehicles(line, mapStops);
+  const vehicles = useMemo(
+    () => vehiclesToDraw(selectedStop !== null, allVehicles, lineVehicles, line),
+    [selectedStop, allVehicles, lineVehicles, line],
+  );
   const matchedLines = useMemo(() => searchLines(lines, deferredQuery), [lines, deferredQuery]);
   const results = useMemo(() => searchStops(stops, deferredQuery, line), [stops, deferredQuery, line]);
 
@@ -120,6 +146,7 @@ export default function ZaraBusApp({ panelFooter }: ZaraBusAppProps) {
         unavailable={lineRoute.unavailable}
         error={lineRoute.error}
       />
+      <LineVehiclesNotice line={line} count={lineVehicles === null ? null : lineVehicles.length} />
     </>
   );
 
