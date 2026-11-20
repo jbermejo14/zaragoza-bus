@@ -7,6 +7,8 @@ import { Header } from '../components/Header';
 import LineEmptyNotice from '../components/LineEmptyNotice';
 import PanelFooter from '../components/PanelFooter';
 import PanelHeader from '../components/PanelHeader';
+import RouteNotice from '../components/RouteNotice';
+import SearchResults from '../components/SearchResults';
 import StopBoard from '../components/StopBoard';
 import type { Arrival, BusStop } from '../lib/types';
 
@@ -105,4 +107,30 @@ test('pie del panel: sobre este servicio, logos por tema, atribución OSM y enla
   assert.ok(html.includes('ododex-logo-light.svg') && html.includes('ododex-logo-dark.svg'));
   assert.ok(html.includes('https://www.openstreetmap.org/copyright'));
   for (const route of ['/aviso-legal', '/privacidad', '/cookies']) assert.ok(html.includes(`href="${route}"`), route);
+});
+
+function renderSearchResults(lines: string[], results: BusStop[]) {
+  return renderToStaticMarkup(
+    <SearchResults lines={lines} results={results} loading={false} onSelect={NOOP} onSelectLine={NOOP} />,
+  );
+}
+
+test('resultados de búsqueda muestran el bloque de líneas como botones accesibles', () => {
+  const html = renderSearchResults(['Ci1', 'Ci2'], [STOP]);
+  assert.ok(html.includes('aria-label="Ver la línea Ci1"') && html.includes('aria-label="Ver la línea Ci2"'));
+  assert.ok(html.includes('Abrir el poste 104'));
+});
+
+test('resultados con solo líneas no muestran «Sin resultados»', () => {
+  assert.ok(!renderSearchResults(['Ci1'], []).includes('Sin resultados'));
+});
+
+test('resultados sin líneas ni paradas muestran «Sin resultados»', () => {
+  assert.ok(renderSearchResults([], []).includes('Sin resultados'));
+});
+
+test('RouteNotice con recorrido no publicado muestra aviso informativo sin tono de error', () => {
+  const html = renderToStaticMarkup(<RouteNotice line="Ci4" route={null} loading={false} unavailable fromFilter />);
+  assert.match(html, /El Ayuntamiento no publica el recorrido de la línea Ci4: se muestran sus paradas\./);
+  assert.doesNotMatch(html, /No se pudo cargar/);
 });

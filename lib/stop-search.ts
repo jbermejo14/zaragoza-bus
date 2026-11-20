@@ -44,6 +44,27 @@ export function compareLines(a: string, b: string): number {
   return naturalCollator.compare(a, b);
 }
 
+const CHIP_GROUP_ORDER = [
+  LINE_GROUP_CIRCULAR,
+  LINE_GROUP_NUMERIC,
+  LINE_GROUP_C,
+  LINE_GROUP_NIGHT,
+  LINE_GROUP_OTHER,
+];
+
+/**
+ * Compara líneas para la fila de chips: primero `Ci…`, luego numéricas, `C…`, `N…` y el resto;
+ * dentro de cada grupo, orden natural.
+ */
+export function compareChipLines(a: string, b: string): number {
+  const groupDifference =
+    CHIP_GROUP_ORDER.indexOf(stopSearchLineGroup(a)) - CHIP_GROUP_ORDER.indexOf(stopSearchLineGroup(b));
+  if (groupDifference !== 0) {
+    return groupDifference;
+  }
+  return naturalCollator.compare(a, b);
+}
+
 /** Líneas distintas de todos los postes, ordenadas con `compareLines`. */
 export function listLines(stops: readonly BusStop[]): string[] {
   const lines = new Set<string>();
@@ -53,6 +74,35 @@ export function listLines(stops: readonly BusStop[]): string[] {
     }
   }
   return [...lines].sort(compareLines);
+}
+
+const LINE_QUERY_PREFIX = /^(l[ií]nea|l\.)\s*/;
+const WHITESPACE = /\s+/g;
+const LINE_SEARCH_LIMIT = 8;
+
+function stopSearchNormalizeLineQuery(query: string): string {
+  return query.trim().toLowerCase().replace(LINE_QUERY_PREFIX, '').replace(WHITESPACE, '');
+}
+
+/**
+ * Busca líneas por nombre: ignora mayúsculas, espacios y un prefijo «línea»/«linea»/«l.».
+ * Primero la coincidencia exacta y después las que empiezan por la consulta, en orden de `compareLines`.
+ */
+export function searchLines(
+  lines: readonly string[],
+  query: string,
+  limit: number = LINE_SEARCH_LIMIT,
+): string[] {
+  const normalizedQuery = stopSearchNormalizeLineQuery(query);
+  if (normalizedQuery === '') {
+    return [];
+  }
+  const matches = lines
+    .filter((line) => line.toLowerCase().startsWith(normalizedQuery))
+    .sort(compareLines);
+  const exact = matches.filter((line) => line.toLowerCase() === normalizedQuery);
+  const rest = matches.filter((line) => line.toLowerCase() !== normalizedQuery);
+  return [...exact, ...rest].slice(0, limit);
 }
 
 /** Busca un poste por su número exacto; `null` si no existe. */

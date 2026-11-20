@@ -1,3 +1,5 @@
+import { compareChipLines } from '../lib/stop-search';
+
 interface LineFilterProps {
   lines: readonly string[];
   activeLine: string | null;
@@ -11,7 +13,7 @@ export default function LineFilter({ lines, activeLine, onChange }: LineFilterPr
   }
   return (
     <div role="group" aria-label="Filtrar por línea" className="scrollbar-hidden flex gap-2 overflow-x-auto px-4 pb-3">
-      {lines.map((line) => {
+      {[...lines].sort(compareChipLines).map((line) => {
         const isActive = line === activeLine;
         return (
           <button

@@ -2,7 +2,7 @@
 
 import { useCallback, useDeferredValue, useMemo, useRef, useState, type ReactNode } from 'react';
 import { stopsForLine, visibleVehicles } from '../lib/line-filter';
-import { findStopByNumber, listLines, searchStops } from '../lib/stop-search';
+import { findStopByNumber, listLines, searchLines, searchStops } from '../lib/stop-search';
 import { pickRouteLine, toggleHighlightedLine } from '../lib/route-line';
 import type { BusStop } from '../lib/types';
 import { useArrivals } from '../lib/use-arrivals';
@@ -67,6 +67,7 @@ export default function ZaraBusApp({ panelFooter }: ZaraBusAppProps) {
   const vehicles = useMemo(() => visibleVehicles(allVehicles, line), [allVehicles, line]);
   const lines = useMemo(() => listLines(stops), [stops]);
   const mapStops = useMemo(() => stopsForLine(stops, line), [stops, line]);
+  const matchedLines = useMemo(() => searchLines(lines, deferredQuery), [lines, deferredQuery]);
   const results = useMemo(() => searchStops(stops, deferredQuery, line), [stops, deferredQuery, line]);
 
   const closeStopForSearch = useCallback(() => {
@@ -99,6 +100,10 @@ export default function ZaraBusApp({ panelFooter }: ZaraBusAppProps) {
     [stopNumber, highlightedLine],
   );
   const selectStop = useCallback((stop: BusStop) => selectStopNumber(stop.number), [selectStopNumber]);
+  const selectLineFromSearch = useCallback((selectedLine: string) => {
+    setLine(selectedLine);
+    setQuery('');
+  }, []);
   const clearLineFilter = useCallback(() => setLine(null), []);
 
   const headerSource = selectedStop === null ? stopsState : arrivals;
@@ -113,6 +118,7 @@ export default function ZaraBusApp({ panelFooter }: ZaraBusAppProps) {
         line={pickRouteLine(line, highlightedLine)}
         route={lineRoute.route}
         loading={lineRoute.loading}
+        unavailable={lineRoute.unavailable}
         error={lineRoute.error}
         fromFilter={line !== null}
       />
@@ -153,7 +159,13 @@ export default function ZaraBusApp({ panelFooter }: ZaraBusAppProps) {
             onRefresh={arrivals.refresh}
           />
         ) : isSearching ? (
-          <SearchResults results={results} loading={stopsState.loading} onSelect={selectStop} />
+          <SearchResults
+            lines={matchedLines}
+            results={results}
+            loading={stopsState.loading}
+            onSelect={selectStop}
+            onSelectLine={selectLineFromSearch}
+          />
         ) : (
           <HomePanel
             stops={stops}

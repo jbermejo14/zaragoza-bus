@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SEARCH_RESULT_LIMIT } from '../lib/config';
-import { compareLines, findStopByNumber, listLines, searchStops } from '../lib/stop-search';
+import { compareChipLines, compareLines, findStopByNumber, listLines, searchLines, searchStops } from '../lib/stop-search';
 import type { BusStop } from '../lib/types';
 
 function makeStop(number: string, name: string, lines: string[]): BusStop {
@@ -97,4 +97,38 @@ test('findStopByNumber: exacto o null', () => {
   assert.equal(findStopByNumber(STOPS, '104')?.id, 'tuzsa-104');
   assert.equal(findStopByNumber(STOPS, '10400'), null);
   assert.equal(findStopByNumber(STOPS, '1'), null);
+});
+
+const ALL_LINES = ['21', '22', '23', '24', 'Ci1', 'Ci2', 'Ci3', 'Ci4', 'C1', 'N1', 'N2', 'N3', 'N4', 'N5', 'N6', 'N7'];
+
+test('searchLines: prefijo de circulares', () => {
+  assert.deepEqual(searchLines(ALL_LINES, 'ci'), ['Ci1', 'Ci2', 'Ci3', 'Ci4']);
+});
+
+test('searchLines: coincidencia exacta sin distinguir mayúsculas', () => {
+  assert.deepEqual(searchLines(ALL_LINES, 'Ci1'), ['Ci1']);
+  assert.deepEqual(searchLines(ALL_LINES, 'CI1'), ['Ci1']);
+});
+
+test('searchLines: prefijo «línea», «linea» y «l.», con o sin espacio', () => {
+  assert.deepEqual(searchLines(ALL_LINES, 'línea 24'), ['24']);
+  assert.deepEqual(searchLines(ALL_LINES, 'linea24'), ['24']);
+  assert.deepEqual(searchLines(ALL_LINES, 'l. ci 2'), ['Ci2']);
+});
+
+test('searchLines: la exacta va antes que las de prefijo', () => {
+  assert.deepEqual(searchLines(['1', '10', '11', 'N1'], '1'), ['1', '10', '11']);
+});
+
+test('searchLines: respeta el límite y devuelve vacío sin coincidencias o sin consulta', () => {
+  assert.deepEqual(searchLines(ALL_LINES, 'n'), ['N1', 'N2', 'N3', 'N4', 'N5', 'N6', 'N7']);
+  assert.equal(searchLines(['21', '22', '23', '24', '25', '26', '27', '28', '29'], '2').length, 8);
+  assert.deepEqual(searchLines(ALL_LINES, 'goya'), []);
+  assert.deepEqual(searchLines(ALL_LINES, '  '), []);
+  assert.deepEqual(searchLines(ALL_LINES, 'línea'), []);
+});
+
+test('compareChipLines: circulares, números, C, N y resto', () => {
+  const sorted = ['N1', 'Z9', 'C1', 'Ci2', '30', 'Ci1', '9'].sort(compareChipLines);
+  assert.deepEqual(sorted, ['Ci1', 'Ci2', '9', '30', 'C1', 'N1', 'Z9']);
 });

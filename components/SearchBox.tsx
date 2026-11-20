@@ -8,7 +8,7 @@ interface SearchBoxProps {
   onSubmit: (value: string) => void;
 }
 
-/** Campo de búsqueda por número de poste o nombre de calle. */
+/** Campo de búsqueda por número de poste, calle o línea. */
 export default function SearchBox({ value, onChange, onSubmit }: SearchBoxProps) {
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -30,8 +30,8 @@ export default function SearchBox({ value, onChange, onSubmit }: SearchBoxProps)
           autoComplete="off"
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          placeholder="Nº de poste o calle"
-          aria-label="Buscar parada por número de poste o calle"
+          placeholder="Nº de poste, calle o línea"
+          aria-label="Buscar parada por número de poste, calle o línea"
           className="w-full rounded-xl border border-line bg-card py-3 pr-11 pl-10 text-base placeholder:text-muted focus-visible:border-accent"
         />
         {value !== '' && (
