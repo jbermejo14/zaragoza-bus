@@ -101,9 +101,9 @@ test('cabecera del panel: título, subtítulo, indicador y botón de tema', () =
   assert.ok(html.includes('Cambiar entre modo claro y oscuro'));
 });
 
-test('pie del panel: sobre este servicio, logos por tema, atribución OSM y enlaces legales', () => {
+test('pie del panel: enlace a «Sobre este servicio», logos por tema, atribución OSM y enlaces legales', () => {
   const html = renderToStaticMarkup(<PanelFooter />);
-  assert.ok(html.includes('Sobre este servicio'));
+  assert.ok(html.includes('href="/sobre-el-servicio"') && html.includes('Sobre este servicio y de dónde salen los datos'));
   assert.ok(html.includes('ododex-logo-light.svg') && html.includes('ododex-logo-dark.svg'));
   assert.ok(html.includes('https://www.openstreetmap.org/copyright'));
   for (const route of ['/aviso-legal', '/privacidad', '/cookies']) assert.ok(html.includes(`href="${route}"`), route);
@@ -130,7 +130,11 @@ test('resultados sin líneas ni paradas muestran «Sin resultados»', () => {
 });
 
 test('RouteNotice con recorrido no publicado muestra aviso informativo sin tono de error', () => {
-  const html = renderToStaticMarkup(<RouteNotice line="Ci4" route={null} loading={false} unavailable fromFilter />);
+  const html = renderToStaticMarkup(<RouteNotice line="Ci4" loading={false} unavailable />);
   assert.match(html, /El Ayuntamiento no publica el recorrido de la línea Ci4: se muestran sus paradas\./);
   assert.doesNotMatch(html, /No se pudo cargar/);
+});
+
+test('RouteNotice con recorrido cargado no muestra nota de antigüedad', () => {
+  assert.equal(renderToStaticMarkup(<RouteNotice line="Ci4" loading={false} />), '');
 });

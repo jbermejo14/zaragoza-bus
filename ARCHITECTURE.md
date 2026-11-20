@@ -405,3 +405,12 @@ Petición del titular: buscar una línea por su nombre (Ci1, Ci2…): las circul
 - Fila de chips: además, las circulares (Ci…) van primero, porque son las más buscadas: el orden de los chips pasa a ser circulares, números, C…, N…, resto (función nueva `compareChipLines` o parámetro; `compareLines` no cambia para no romper otros usos).
 - Placeholder del buscador: «Nº de poste, calle o línea».
 - Pruebas en `tests/stop-search.test.ts` para `searchLines` y el orden de chips; prueba de componente para el bloque «Líneas» si es sencillo.
+
+## 4g. Página “Sobre este servicio” (2026-11-20)
+
+Petición del titular: quitar un texto de ayuda del panel y sacar el bloque informativo a su propia página.
+
+- `components/RouteNotice.tsx`: se elimina la nota «Recorrido oficial publicado por el Ayuntamiento (2013)…» y, con ella, las props `fromFilter` y `route`, que solo servían para eso (también en `ZaraBusApp`). Se mantienen los avisos de carga, de error y de recorrido no publicado.
+- Nueva página `app/sobre-el-servicio/page.tsx` (`/es/zaragoza-bus/sobre-el-servicio`): `SiteShell`, migas (Inicio › Sobre el servicio), h1 «Sobre este servicio» y el texto de `AboutSection` (que pasa a ser solo el contenido, sin encabezado). Se indexa (sin `noindex`), con `alternates.canonical`, y está en `app/sitemap.ts`.
+- `PanelFooter`: en lugar del bloque, un enlace `next/link` a `/sobre-el-servicio` con icono Info y el texto «Sobre este servicio y de dónde salen los datos» (objetivo táctil de 44 px).
+- Pruebas: `tests/about-page.test.tsx` (sitemap, enlace del panel y página) y ajustes en `tests/panel-components.test.tsx`.

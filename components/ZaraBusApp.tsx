@@ -23,7 +23,7 @@ import SearchResults from './SearchResults';
 import StopBoard from './StopBoard';
 
 interface ZaraBusAppProps {
-  /** «Sobre este servicio» y pie de Ododex, pintados en el servidor (leen ficheros del disco). */
+  /** enlace a «Sobre este servicio» y pie de Ododex, pintados en el servidor (leen ficheros del disco). */
   panelFooter: ReactNode;
 }
 
@@ -116,11 +116,9 @@ export default function ZaraBusApp({ panelFooter }: ZaraBusAppProps) {
       <LineFilter lines={lines} activeLine={line} onChange={setLine} />
       <RouteNotice
         line={pickRouteLine(line, highlightedLine)}
-        route={lineRoute.route}
         loading={lineRoute.loading}
         unavailable={lineRoute.unavailable}
         error={lineRoute.error}
-        fromFilter={line !== null}
       />
     </>
   );
