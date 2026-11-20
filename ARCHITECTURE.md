@@ -414,3 +414,32 @@ Petición del titular: quitar un texto de ayuda del panel y sacar el bloque info
 - Nueva página `app/sobre-el-servicio/page.tsx` (`/es/zaragoza-bus/sobre-el-servicio`): `SiteShell`, migas (Inicio › Sobre el servicio), h1 «Sobre este servicio» y el texto de `AboutSection` (que pasa a ser solo el contenido, sin encabezado). Se indexa (sin `noindex`), con `alternates.canonical`, y está en `app/sitemap.ts`.
 - `PanelFooter`: en lugar del bloque, un enlace `next/link` a `/sobre-el-servicio` con icono Info y el texto «Sobre este servicio y de dónde salen los datos» (objetivo táctil de 44 px).
 - Pruebas: `tests/about-page.test.tsx` (sitemap, enlace del panel y página) y ajustes en `tests/panel-components.test.tsx`.
+
+## 4h. Agrupación mínima de 5 y todos los autobuses de una línea (2026-11-20)
+
+Petición del titular: no agrupar tanto (los grupos de 2, 3 y 4 paradas deben verse como paradas sueltas) y, al seleccionar una línea, ver TODOS sus autobuses con su posición GPS.
+
+### Agrupación propia (sustituye a `leaflet.markercluster`)
+
+`leaflet.markercluster` no permite un tamaño mínimo de grupo, así que se sustituye por una agrupación en rejilla propia, pura y probada:
+
+```ts
+// lib/stop-clustering.ts
+export interface ScreenPoint { x: number; y: number; }
+export interface StopCluster<T> { items: T[]; } // items.length >= minSize
+export interface ClusteringResult<T> { clusters: StopCluster<T>[]; singles: T[]; }
+export function clusterByGrid<T>(items: readonly T[], toScreen: (item: T) => ScreenPoint, cellSizePx: number, minSize: number): ClusteringResult<T>;
+```
+
+- Reparte los elementos en celdas de `cellSizePx` (por defecto 56 px) según su posición en pantalla al zoom actual; una celda con `minSize` (5) o más elementos es un grupo; con menos, sus elementos se pintan sueltos. Orden estable (el de entrada).
+- `BusMap`: sin poste abierto, recalcula en `zoomend`/`moveend` solo con los postes dentro de la vista ampliada un 20 %; a partir de zoom 16 no agrupa. El grupo se pinta con el icono `.zb-cluster` actual (número de paradas), centrado en la media de sus coordenadas; pulsarlo hace `fitBounds` de sus paradas (con el relleno del panel). Las paradas sueltas, con el `circleMarker` actual en el renderizador canvas. Con poste abierto, como hoy: todas sueltas.
+- Se deja de importar `leaflet.markercluster` y su CSS (la dependencia se quita de `package.json` aparte).
+
+### Todos los autobuses de una línea
+
+El GPS de Avanza solo responde por parada (comprobado: `poste=0` devuelve `{"tablatiempos":""}` y no hay rutas por línea). Cada parada devuelve los autobuses que se dirigen a ella (típicamente los dos próximos de cada línea), así que consultando varias paradas repartidas por la línea y uniendo por coche se obtienen prácticamente todos.
+
+- Worker (`../ododex-sitio/workers/zaragoza-bus.mjs`), ruta nueva `GET /es/zaragoza-bus/api/gps-linea/{línea}?postes=N1,N2,…`: `línea` `/^[A-Za-z0-9]{1,4}$/`; `postes` de 1 a 10 números `/^\d{1,5}$/` sin repetir (si no, 400). Consulta en paralelo el GPS de cada poste reutilizando la función y la caché de 15 s de `/api/gps/` (una petición a Avanza por poste y 15 s, compartida entre usuarios), une los autobuses de esa línea (comparación de línea sin ceros a la izquierda y sin mayúsculas) por `coche`, y responde `{ "linea": "25", "autobuses": [ { coche, linea, destino, latitud, longitud } ], "postesConsultados": 8, "postesFallidos": 0 }` (sin `llegadas`: dependen de la parada). Si fallan todos los postes → 502; si falla alguno, responde con los demás y lo cuenta en `postesFallidos`. Cabeceras como `/api/gps/`.
+- Cliente: `lib/line-vehicles.ts` con `pickSampleStops(stops: readonly BusStop[], count: number): BusStop[]` (muestreo del punto más lejano sobre las paradas de la línea, empezando por la más al oeste, para repartirlas por todo el recorrido; determinista) y `fetchLineVehicles(line, stopNumbers, fetchFn): Promise<BusVehicle[]>` (con `parse` propio que valide el JSON; error de formato con `FormatError`). `lineVehiclesProxyUrl(line, stopNumbers)` en `lib/config.ts`. Hook `useLineVehicles(line: string | null, stops)` con 8 paradas de muestra, refresco cada 30 s, pausa con la pestaña oculta, sin datos demo (si falla, no se dibuja nada).
+- Mapa: con línea seleccionada y sin poste abierto, se dibujan todos sus autobuses con el icono actual de bus (tooltip «Línea 25 → La Cartuja · coche 4253», sin minutos). Con poste abierto se mantiene el comportamiento de §4d/§4e (autobuses que van a ese poste, con minutos). El encuadre de la línea (recorrido o paradas) no cambia por la llegada de autobuses.
+- Aviso discreto en el panel con línea seleccionada: «N autobuses de la línea X en servicio ahora» (o «No hay autobuses de la línea X en servicio ahora» si la lista llega vacía; nada si falla).
