@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import ArrivalList from '../components/ArrivalList';
 import { Header } from '../components/Header';
 import LineEmptyNotice from '../components/LineEmptyNotice';
+import LineFilter from '../components/LineFilter';
 import PanelFooter from '../components/PanelFooter';
 import PanelHeader from '../components/PanelHeader';
 import RouteNotice from '../components/RouteNotice';
@@ -137,4 +138,10 @@ test('RouteNotice con recorrido no publicado muestra aviso informativo sin tono 
 
 test('RouteNotice con recorrido cargado no muestra nota de antigüedad', () => {
   assert.equal(renderToStaticMarkup(<RouteNotice line="Ci4" loading={false} />), '');
+});
+
+test('LineFilter: el chip activo muestra «✕» y se anuncia como «Quitar la línea N»', () => {
+  const html = renderToStaticMarkup(<LineFilter lines={['25', 'Ci2']} activeLine="Ci2" onChange={NOOP} />);
+  assert.ok(html.includes('aria-label="Quitar la línea Ci2"'));
+  assert.equal(html.split('aria-label="Quitar la línea').length - 1, 1);
 });

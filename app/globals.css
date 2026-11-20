@@ -39,6 +39,8 @@
    en tiempo de ejecución (Leaflet los pinta como atributos SVG, que no admiten var()). */
 :root {
   --site-header-height: 3.5rem;
+  /* Borde derecho de la tarjeta lateral de escritorio (left-4 + w-[420px]): la píldora se centra a su derecha. */
+  --panel-right-edge: 27.25rem;
   --map-stop-color: var(--color-accent);
   --map-stop-border-color: #ffffff;
   --map-selected-color: #991b1b;
@@ -505,5 +507,13 @@ body {
 
   .leaflet-container .leaflet-control-attribution a {
     color: var(--color-accent-text);
+  }
+}
+
+/* En móvil la píldora de la línea ocupa la franja superior del mapa: el zoom baja por debajo de ella
+   (borde superior 0,75 rem + alto 52 px + 0,75 rem de aire). */
+@media (max-width: 1023.98px) {
+  .leaflet-top.leaflet-right {
+    margin-top: calc(env(safe-area-inset-top) + 76px);
   }
 }

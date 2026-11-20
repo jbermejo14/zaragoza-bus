@@ -22,29 +22,34 @@ interface LineVehiclesState {
   hasData: boolean;
   /** La primera ronda de consultas de esta línea ha terminado (con éxito o no). */
   complete: boolean;
+  /** La primera ronda terminó sin respuesta de ninguna parada. */
+  failed: boolean;
 }
 
-const EMPTY_STATE: LineVehiclesState = { line: null, vehicles: [], hasData: false, complete: false };
+const EMPTY_STATE: LineVehiclesState = { line: null, vehicles: [], hasData: false, complete: false, failed: false };
 
 /** Resultado del hook: autobuses conocidos (null si no se sabe) y si ya han respondido todas las paradas. */
 export interface LineVehiclesResult {
   vehicles: BusVehicle[] | null;
   /** Falso mientras la primera ronda sigue en curso: aún pueden aparecer más autobuses. */
   complete: boolean;
+  /** La primera ronda terminó sin que respondiera ninguna parada: los autobuses de la línea no están disponibles. */
+  failed: boolean;
 }
 
-const UNKNOWN_RESULT: LineVehiclesResult = { vehicles: null, complete: false };
+const UNKNOWN_RESULT: LineVehiclesResult = { vehicles: null, complete: false, failed: false };
 
 function addVehicles(previous: LineVehiclesState, line: string, incoming: BusVehicle[]): LineVehiclesState {
   const base = previous.line === line ? previous : { ...EMPTY_STATE, line };
-  return { ...base, vehicles: mergeVehicles(base.vehicles, incoming), hasData: true };
+  return { ...base, vehicles: mergeVehicles(base.vehicles, incoming), hasData: true, failed: false };
 }
 
 function finishRound(previous: LineVehiclesState, line: string, seen: ReadonlySet<string> | null): LineVehiclesState {
   const base = previous.line === line ? previous : { ...EMPTY_STATE, line };
   // Sin ninguna respuesta (fallo total) se conserva lo anterior en vez de vaciar el mapa.
   const vehicles = seen === null ? base.vehicles : retainSeenVehicles(base.vehicles, seen);
-  return { ...base, vehicles, complete: true };
+  // Un fallo total solo cuenta si nunca hubo datos: una ronda posterior caída conserva lo ya mostrado.
+  return { ...base, vehicles, complete: true, failed: seen === null && !base.hasData };
 }
 
 /**
@@ -127,5 +132,5 @@ export function useLineVehicles(line: string | null, stops: readonly BusStop[]):
   if (line === null || state.line !== line) {
     return UNKNOWN_RESULT;
   }
-  return { vehicles: state.hasData ? state.vehicles : null, complete: state.complete };
+  return { vehicles: state.hasData ? state.vehicles : null, complete: state.complete, failed: state.failed };
 }

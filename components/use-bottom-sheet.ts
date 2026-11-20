@@ -26,7 +26,8 @@ function anchorHeightCss(anchor: SheetAnchor): string {
 /**
  * Estado de la hoja inferior móvil: tres alturas ancladas, arrastre con pointer events sobre el
  * asa y toque para subir a la siguiente. Devuelve el estilo (variable CSS --sheet-height), los
- * manejadores del asa y `revealAtLeast` para abrir la hoja sin cerrarla si ya está más arriba.
+ * manejadores del asa, `revealAtLeast` para abrir la hoja sin cerrarla si ya está más arriba y `collapse`
+ * para bajarla a la altura recogida.
  */
 export function useBottomSheet() {
   const sheetRef = useRef<HTMLElement>(null);
@@ -37,6 +38,8 @@ export function useBottomSheet() {
   const revealAtLeast = useCallback((minimum: SheetAnchor) => {
     setAnchor((current) => higherSheetAnchor(current, minimum));
   }, []);
+
+  const collapse = useCallback(() => setAnchor('collapsed'), []);
 
   const onPointerDown = (event: PointerEvent<HTMLElement>) => {
     const sheet = sheetRef.current;
@@ -94,6 +97,7 @@ export function useBottomSheet() {
     style,
     isDragging: dragHeightPx !== null,
     revealAtLeast,
+    collapse,
     handleProps: { onClick, onPointerDown, onPointerMove, onPointerUp, onPointerCancel },
   };
 }

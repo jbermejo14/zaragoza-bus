@@ -3,7 +3,7 @@ import { CITY_CENTER, MAP_ATTRIBUTION, MAP_DEFAULT_ZOOM, MAP_TILE_URL } from '..
 import type { BusStop, Coordinates } from '../lib/types';
 import * as L from 'leaflet';
 import type { MapColors } from './map-colors';
-import { computeFitPadding, hasUsableSpace, type PanelCover } from './map-viewport';
+import { computeFitPadding, hasUsableSpace, type FitPadding, type PanelCover } from './map-viewport';
 import { VEHICLE_PANE, VEHICLE_PANE_Z_INDEX } from './vehicle-layer';
 
 const ROUTE_PANE = 'zb-route';
@@ -116,8 +116,17 @@ export function fitMapToBounds(
   cover: PanelCover,
   maxZoom?: number,
 ): void {
+  fitMapToPadding(map, bounds, computeFitPadding(cover), maxZoom);
+}
+
+/** Como `fitMapToBounds`, con el relleno ya calculado (p. ej. el de una línea, que reserva también la píldora). */
+export function fitMapToPadding(
+  map: Leaflet.Map,
+  bounds: Leaflet.LatLngBounds,
+  padding: FitPadding,
+  maxZoom?: number,
+): void {
   map.invalidateSize();
-  const padding = computeFitPadding(cover);
   if (!bounds.isValid() || !hasUsableSpace(map.getSize(), padding)) {
     return;
   }

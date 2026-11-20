@@ -13,6 +13,8 @@ interface AppPanelProps {
    * la hoja móvil sube al menos a media altura para que el resultado no quede escondido.
    */
   revealKey: string | null;
+  /** Contador de peticiones de recoger la hoja móvil: cada incremento la baja a su altura recogida. */
+  collapseRequest: number;
   /** Referencia al elemento del panel; el mapa mide con ella el hueco que tapa. */
   panelRef: RefObject<HTMLElement | null>;
 }
@@ -21,8 +23,8 @@ interface AppPanelProps {
  * Contenedor responsive: hoja inferior deslizable de tres alturas en móvil y tarjeta flotante a la
  * izquierda en escritorio (lg y más).
  */
-export default function AppPanel({ top, children, revealKey, panelRef }: AppPanelProps) {
-  const { sheetRef, style, isDragging, revealAtLeast, handleProps } = useBottomSheet();
+export default function AppPanel({ top, children, revealKey, collapseRequest, panelRef }: AppPanelProps) {
+  const { sheetRef, style, isDragging, revealAtLeast, collapse, handleProps } = useBottomSheet();
   const heightTransition = isDragging ? '' : 'transition-[height] duration-300 motion-reduce:transition-none';
 
   // Se decide durante el render (no en un efecto) para que el mapa, que encuadra en sus efectos,
@@ -33,6 +35,13 @@ export default function AppPanel({ top, children, revealKey, panelRef }: AppPane
     if (revealKey !== null) {
       revealAtLeast('half');
     }
+  }
+
+  // Va después del bloque anterior: si coinciden, manda recoger la hoja.
+  const [lastCollapseRequest, setLastCollapseRequest] = useState(collapseRequest);
+  if (collapseRequest !== lastCollapseRequest) {
+    setLastCollapseRequest(collapseRequest);
+    collapse();
   }
 
   return (

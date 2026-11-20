@@ -23,6 +23,7 @@ import { framingPoints, vehiclesToFrame } from '../lib/vehicle-framing';
 import { measurePanelCover } from './map-viewport';
 import { createVehicleMarker } from './vehicle-layer';
 import { useMapColors } from './use-map-colors';
+import { useLineFraming } from './use-line-framing';
 import { useStopLayers } from './use-stop-layers';
 
 interface BusMapProps {
@@ -63,13 +64,9 @@ export default function BusMap({
   const routeLayerRef = useRef<Leaflet.FeatureGroup | null>(null);
   const vehicleLayerRef = useRef<Leaflet.LayerGroup | null>(null);
   const colorsRef = useRef(colors);
-  const stopsRef = useRef(stops);
-  const selectedStopRef = useRef(selectedStop);
 
   useEffect(() => {
     colorsRef.current = colors;
-    stopsRef.current = stops;
-    selectedStopRef.current = selectedStop;
   });
 
   // Solo lee refs (el mapa y el panel), por eso los efectos que lo usan no lo declaran como dependencia.
@@ -132,18 +129,7 @@ export default function BusMap({
     route?.paths.forEach((path) => createRoutePolyline(path, colorsRef.current).addTo(layer));
   }, [route]);
 
-  // Encuadre del filtro de línea: su recorrido o, si no lo hay, sus postes. Con un poste abierto la vista ya está en él.
-  useEffect(() => {
-    const layer = routeLayerRef.current;
-    if (layer === null || lineFilter === null || selectedStopRef.current !== null) {
-      return;
-    }
-    if (route !== null) {
-      fitTo(layer.getBounds());
-    } else if (routeSettled) {
-      fitTo(boundsOfPositions(stopsRef.current.map((stop) => stop.coordinates)));
-    }
-  }, [lineFilter, route, routeSettled]);
+  useLineFraming({ mapRef, routeLayerRef, panelRef, lineFilter, route, routeSettled, stops, selectedStop });
 
   useEffect(() => {
     const layer = selectionLayerRef.current;
