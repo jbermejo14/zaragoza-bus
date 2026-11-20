@@ -11,7 +11,10 @@ import {
   createBaseMap,
   createClusterGroup,
   createRoutePolyline,
+  createStopCanvasRenderer,
   createStopMarker,
+  FRAME_MAX_VEHICLES,
+  FRAME_MAX_ZOOM,
   fitMapToBounds,
   routeStyle,
   selectedStopStyle,
@@ -19,6 +22,7 @@ import {
   toLatLng,
   userStyle,
 } from './bus-map-layers';
+import { framingPoints, vehiclesToFrame } from '../lib/vehicle-framing';
 import { L } from './leaflet-with-clusters';
 import { measurePanelCover } from './map-viewport';
 import { createVehicleMarker } from './vehicle-layer';
@@ -41,7 +45,7 @@ interface BusMapProps {
   onSelectStop: (stop: BusStop) => void;
 }
 
-/** Mapa Leaflet con los postes agrupados, el recorrido, el poste seleccionado y la posición del usuario. */
+/** Mapa Leaflet con los postes (agrupados, o sueltos con un poste abierto), el recorrido, el poste seleccionado y la posición del usuario. */
 export default function BusMap({
   stops,
   selectedStop,
@@ -57,6 +61,9 @@ export default function BusMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Leaflet.Map | null>(null);
   const clusterRef = useRef<Leaflet.MarkerClusterGroup | null>(null);
+  const plainStopsRef = useRef<Leaflet.LayerGroup | null>(null);
+  const stopRendererRef = useRef<Leaflet.Canvas | null>(null);
+  const framedStopRef = useRef<string | null>(null);
   const stopMarkersRef = useRef<Leaflet.CircleMarker[]>([]);
   const selectionLayerRef = useRef<Leaflet.LayerGroup | null>(null);
   const userLayerRef = useRef<Leaflet.LayerGroup | null>(null);
@@ -91,6 +98,8 @@ export default function BusMap({
     const map = createBaseMap(container);
     routeLayerRef.current = L.featureGroup().addTo(map);
     clusterRef.current = createClusterGroup().addTo(map);
+    plainStopsRef.current = L.layerGroup().addTo(map);
+    stopRendererRef.current = createStopCanvasRenderer();
     selectionLayerRef.current = L.layerGroup().addTo(map);
     userLayerRef.current = L.layerGroup().addTo(map);
     vehicleLayerRef.current = L.layerGroup().addTo(map);
@@ -102,6 +111,8 @@ export default function BusMap({
       map.remove();
       mapRef.current = null;
       clusterRef.current = null;
+      plainStopsRef.current = null;
+      stopRendererRef.current = null;
       routeLayerRef.current = null;
       selectionLayerRef.current = null;
       userLayerRef.current = null;
@@ -110,18 +121,32 @@ export default function BusMap({
     };
   }, []);
 
+  // Con un poste abierto los postes van sueltos (canvas); sin poste, agrupados. Cada modo recrea sus marcadores
+  // porque el renderizador de un círculo se fija al añadirlo al mapa.
+  const hasSelection = selectedStop !== null;
   useEffect(() => {
     const cluster = clusterRef.current;
-    if (cluster === null) {
+    const plain = plainStopsRef.current;
+    if (cluster === null || plain === null) {
       return;
     }
+    const renderer = hasSelection ? (stopRendererRef.current ?? undefined) : undefined;
     const markers = stops.map((stop) =>
-      createStopMarker(stop, (selected) => onSelectStopRef.current(selected), colorsRef.current),
+      createStopMarker(stop, (selected) => onSelectStopRef.current(selected), colorsRef.current, renderer),
     );
     stopMarkersRef.current = markers;
     cluster.clearLayers();
-    cluster.addLayers(markers);
-  }, [stops]);
+    plain.clearLayers();
+    if (hasSelection) {
+      markers.forEach((marker) => marker.addTo(plain));
+    } else {
+      cluster.addLayers(markers);
+    }
+    return () => {
+      cluster.clearLayers();
+      plain.clearLayers();
+    };
+  }, [stops, hasSelection]);
 
   // Cambio de tema: se repintan las capas existentes sin recrear el mapa ni los marcadores.
   useEffect(() => {
@@ -188,6 +213,24 @@ export default function BusMap({
     layer.clearLayers();
     vehicles.forEach((vehicle) => createVehicleMarker(L, vehicle).addTo(layer));
   }, [vehicles]);
+
+  // Cada apertura de poste (o cierre) permite un nuevo encuadre con autobuses.
+  useEffect(() => {
+    framedStopRef.current = null;
+  }, [selectedStop]);
+
+  // Una vez por poste abierto, cuando llegan sus autobuses: encuadra el poste y los más próximos.
+  useEffect(() => {
+    if (selectedStop === null || framedStopRef.current === selectedStop.number) {
+      return;
+    }
+    const nearest = vehiclesToFrame(vehicles, lineFilter, FRAME_MAX_VEHICLES);
+    if (nearest.length === 0) {
+      return;
+    }
+    framedStopRef.current = selectedStop.number;
+    fitTo(boundsOfPositions(framingPoints(selectedStop, nearest)), FRAME_MAX_ZOOM);
+  }, [selectedStop, vehicles, lineFilter]);
 
   return <div ref={containerRef} className="absolute inset-0" role="region" aria-label="Mapa de postes" />;
 }

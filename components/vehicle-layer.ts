@@ -3,8 +3,24 @@ import { cleanDestination } from '../lib/arrivals-parser';
 import type { BusVehicle, VehicleArrival } from '../lib/bus-vehicles';
 
 const ARRIVAL_SEPARATOR = ' / ';
-const VEHICLE_ICON_WIDTH_PX = 38;
-const VEHICLE_ICON_HEIGHT_PX = 22;
+const VEHICLE_ICON_WIDTH_PX = 58;
+const VEHICLE_ICON_HEIGHT_PX = 30;
+
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+const BUS_GLYPH_SIZE_PX = 18;
+const BUS_GLYPH_VIEW_BOX = '0 0 24 24';
+const BUS_GLYPH_STROKE_WIDTH = '2.2';
+/** Silueta de autobús (icono «Bus» de lucide, licencia ISC) dibujada con trazos del color del texto. */
+const BUS_GLYPH_PATHS = [
+  'M8 6v6',
+  'M15 6v6',
+  'M2 12h19.6',
+  'M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3',
+  'M9 18h5',
+];
+const BUS_GLYPH_WHEELS = [7, 16];
+const BUS_GLYPH_WHEEL_Y = '18';
+const BUS_GLYPH_WHEEL_RADIUS = '2';
 
 function arrivalText(arrival: VehicleArrival): string {
   return `${arrival.minutes} min (${arrival.km} km)`;
@@ -34,19 +50,55 @@ function textElement(text: string): HTMLSpanElement {
   return element;
 }
 
+/** Icono de autobús como SVG propio (sin HTML de terceros), decorativo: el texto accesible va en la etiqueta. */
+function busGlyph(): SVGSVGElement {
+  const svg = document.createElementNS(SVG_NAMESPACE, 'svg');
+  svg.setAttribute('viewBox', BUS_GLYPH_VIEW_BOX);
+  svg.setAttribute('width', String(BUS_GLYPH_SIZE_PX));
+  svg.setAttribute('height', String(BUS_GLYPH_SIZE_PX));
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', BUS_GLYPH_STROKE_WIDTH);
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  BUS_GLYPH_PATHS.forEach((definition) => {
+    const path = document.createElementNS(SVG_NAMESPACE, 'path');
+    path.setAttribute('d', definition);
+    svg.appendChild(path);
+  });
+  BUS_GLYPH_WHEELS.forEach((centerX) => {
+    const wheel = document.createElementNS(SVG_NAMESPACE, 'circle');
+    wheel.setAttribute('cx', String(centerX));
+    wheel.setAttribute('cy', BUS_GLYPH_WHEEL_Y);
+    wheel.setAttribute('r', BUS_GLYPH_WHEEL_RADIUS);
+    svg.appendChild(wheel);
+  });
+  return svg;
+}
+
+/** Insignia: icono de autobús y número de línea; es el elemento con `role="img"` y la descripción completa. */
+function vehicleBadge(vehicle: BusVehicle, description: string): HTMLSpanElement {
+  const badge = document.createElement('span');
+  badge.className = 'zb-bus-badge';
+  badge.setAttribute('role', 'img');
+  badge.setAttribute('aria-label', description);
+  const line = textElement(vehicle.line);
+  line.className = 'zb-bus-line';
+  badge.append(busGlyph(), line);
+  return badge;
+}
+
 /**
- * Marcador de un autobús: etiqueta con el número de línea (estilos `.zb-bus` en globals.css, que
+ * Marcador de un autobús: insignia con icono y número de línea (estilos `.zb-bus` en globals.css, que
  * cambian con el tema) y tooltip con sus datos. Recibe Leaflet como parámetro (y no importa
  * bus-map-layers) para que este módulo se pueda probar en Node, donde Leaflet no carga.
  * Todo el texto va como nodos de texto, nunca como HTML.
  */
 export function createVehicleMarker(leaflet: typeof Leaflet, vehicle: BusVehicle): Leaflet.Marker {
   const description = vehicleTooltipText(vehicle);
-  const label = textElement(vehicle.line);
-  label.setAttribute('role', 'img');
-  label.setAttribute('aria-label', description);
   const icon = leaflet.divIcon({
-    html: label,
+    html: vehicleBadge(vehicle, description),
     className: 'zb-bus',
     iconSize: leaflet.point(VEHICLE_ICON_WIDTH_PX, VEHICLE_ICON_HEIGHT_PX),
   });

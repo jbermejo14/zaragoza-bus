@@ -455,28 +455,38 @@ body {
     border-radius: 9999px;
     background: var(--map-stop-color);
     color: #ffffff;
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 700;
     box-shadow: 0 1px 4px rgba(15, 23, 42, 0.35);
   }
 
-  /* Autobús con GPS: etiqueta redondeada con el número de línea, en los colores del tema. */
+  /* Autobús con GPS: insignia redondeada con icono de bus y número de línea, en los colores del tema. */
   .zb-bus {
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 2px solid var(--map-bus-border-color);
-    border-radius: 6px;
+    border: 3px solid var(--map-bus-border-color);
+    border-radius: 9px;
     background: var(--map-bus-color);
     color: var(--map-bus-text-color);
-    font-size: 12px;
-    font-weight: 700;
-    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.35);
-    /* Líneas largas (p. ej. «CI12»): la etiqueta crece en vez de desbordar. */
-    min-width: 38px;
+    font-size: 14px;
+    font-weight: 800;
+    box-shadow: 0 0 0 1px var(--map-bus-color), 0 3px 8px rgba(15, 23, 42, 0.5);
+    /* Líneas largas (p. ej. «CI12»): la insignia crece en vez de desbordar. */
+    min-width: 58px;
     width: auto !important;
-    padding: 0 4px;
+    padding: 0 6px;
     white-space: nowrap;
+  }
+
+  .zb-bus-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .zb-bus-line {
+    line-height: 1;
   }
 
   .stop-tooltip {

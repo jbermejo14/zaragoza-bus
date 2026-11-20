@@ -12,15 +12,27 @@ const ROUTE_PANE_Z_INDEX = 390;
 const ROUTE_WEIGHT = 4;
 const ROUTE_OPACITY = 0.75;
 
-const STOP_RADIUS = 6;
-const SELECTED_STOP_RADIUS = 11;
+/** Encima de los postes (vector 400) y del recorrido; el poste seleccionado nunca queda tapado. */
+const SELECTED_PANE = 'zb-selected';
+const SELECTED_PANE_Z_INDEX = 450;
+
+const STOP_RADIUS = 8;
+const SELECTED_STOP_RADIUS = 13;
 const USER_RADIUS = 8;
-const STOP_BORDER_WEIGHT = 2;
-const SELECTED_BORDER_WEIGHT = 3;
+const STOP_BORDER_WEIGHT = 2.5;
+/** Anillo rojo grueso del seleccionado (su centro es del color de fondo del tema). */
+const SELECTED_BORDER_WEIGHT = 6;
 const FILL_OPACITY = 1;
-const CLUSTER_ICON_SIZE_PX = 38;
+const CLUSTER_ICON_SIZE_PX = 44;
+/** Margen extra de toque (px) de los postes en canvas, donde no hay un círculo SVG que pulsar. */
+const STOP_CANVAS_TOLERANCE_PX = 8;
 const CLUSTER_MAX_RADIUS_PX = 50;
 const MAP_MAX_ZOOM = 19;
+
+/** Autobuses que se encuadran junto al poste al abrirlo. */
+export const FRAME_MAX_VEHICLES = 3;
+/** Zoom máximo al encuadrar poste y autobuses (el mismo nivel de calle que al abrir un poste). */
+export const FRAME_MAX_ZOOM = 17;
 
 export function toLatLng(position: Coordinates): Leaflet.LatLngTuple {
   return [position.latitude, position.longitude];
@@ -32,6 +44,7 @@ export function createBaseMap(container: HTMLElement): Leaflet.Map {
   L.control.zoom({ position: 'topright' }).addTo(map);
   L.tileLayer(MAP_TILE_URL, { attribution: MAP_ATTRIBUTION, maxZoom: MAP_MAX_ZOOM }).addTo(map);
   map.createPane(ROUTE_PANE).style.zIndex = String(ROUTE_PANE_Z_INDEX);
+  map.createPane(SELECTED_PANE).style.zIndex = String(SELECTED_PANE_Z_INDEX);
   map.createPane(VEHICLE_PANE).style.zIndex = String(VEHICLE_PANE_Z_INDEX);
   return map;
 }
@@ -49,6 +62,11 @@ export function createClusterGroup(): Leaflet.MarkerClusterGroup {
   });
 }
 
+/** Renderizador canvas para los postes sin agrupar: ~1000 círculos pesarían mucho como SVG. */
+export function createStopCanvasRenderer(): Leaflet.Canvas {
+  return L.canvas({ tolerance: STOP_CANVAS_TOLERANCE_PX });
+}
+
 export function stopStyle(colors: MapColors): Leaflet.CircleMarkerOptions {
   return {
     radius: STOP_RADIUS,
@@ -62,10 +80,12 @@ export function stopStyle(colors: MapColors): Leaflet.CircleMarkerOptions {
 export function selectedStopStyle(colors: MapColors): Leaflet.CircleMarkerOptions {
   return {
     radius: SELECTED_STOP_RADIUS,
-    fillColor: colors.selected,
+    // Diana: centro del color de fondo y anillo rojo grueso, distinta de los postes macizos.
+    fillColor: colors.stopBorder,
     fillOpacity: FILL_OPACITY,
-    color: colors.stopBorder,
+    color: colors.selected,
     weight: SELECTED_BORDER_WEIGHT,
+    pane: SELECTED_PANE,
     interactive: false,
   };
 }
@@ -93,8 +113,9 @@ export function createStopMarker(
   stop: BusStop,
   onSelect: (stop: BusStop) => void,
   colors: MapColors,
+  renderer?: Leaflet.Renderer,
 ): Leaflet.CircleMarker {
-  const marker = L.circleMarker(toLatLng(stop.coordinates), stopStyle(colors));
+  const marker = L.circleMarker(toLatLng(stop.coordinates), { ...stopStyle(colors), renderer });
   marker.bindTooltip(`(${stop.number}) ${stop.name}`, { className: 'stop-tooltip' });
   marker.on('click', () => onSelect(stop));
   return marker;
