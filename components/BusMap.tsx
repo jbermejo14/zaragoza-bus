@@ -3,6 +3,7 @@
 import type * as Leaflet from 'leaflet';
 import { useEffect, useRef, type RefObject } from 'react';
 import { MAP_DEFAULT_ZOOM, MAP_SELECTED_ZOOM } from '../lib/config';
+import type { BusVehicle } from '../lib/bus-vehicles';
 import type { LineRoute } from '../lib/line-route';
 import type { BusStop, Coordinates } from '../lib/types';
 import {
@@ -20,6 +21,7 @@ import {
 } from './bus-map-layers';
 import { L } from './leaflet-with-clusters';
 import { measurePanelCover } from './map-viewport';
+import { createVehicleMarker } from './vehicle-layer';
 import { useMapColors } from './use-map-colors';
 
 interface BusMapProps {
@@ -34,6 +36,8 @@ interface BusMapProps {
   routeSettled: boolean;
   /** Panel flotante: el mapa encuadra dejando libre el hueco que tapa. */
   panelRef: RefObject<HTMLElement | null>;
+  /** Autobuses con GPS que se acercan al poste abierto (ya filtrados por línea); vacío = ninguno. */
+  vehicles: readonly BusVehicle[];
   onSelectStop: (stop: BusStop) => void;
 }
 
@@ -46,6 +50,7 @@ export default function BusMap({
   route,
   routeSettled,
   panelRef,
+  vehicles,
   onSelectStop,
 }: BusMapProps) {
   const colors = useMapColors();
@@ -56,6 +61,7 @@ export default function BusMap({
   const selectionLayerRef = useRef<Leaflet.LayerGroup | null>(null);
   const userLayerRef = useRef<Leaflet.LayerGroup | null>(null);
   const routeLayerRef = useRef<Leaflet.FeatureGroup | null>(null);
+  const vehicleLayerRef = useRef<Leaflet.LayerGroup | null>(null);
   const colorsRef = useRef(colors);
   const stopsRef = useRef(stops);
   const selectedStopRef = useRef(selectedStop);
@@ -87,6 +93,7 @@ export default function BusMap({
     clusterRef.current = createClusterGroup().addTo(map);
     selectionLayerRef.current = L.layerGroup().addTo(map);
     userLayerRef.current = L.layerGroup().addTo(map);
+    vehicleLayerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
     const resizeObserver = new ResizeObserver(() => map.invalidateSize());
     resizeObserver.observe(container);
@@ -98,6 +105,7 @@ export default function BusMap({
       routeLayerRef.current = null;
       selectionLayerRef.current = null;
       userLayerRef.current = null;
+      vehicleLayerRef.current = null;
       stopMarkersRef.current = [];
     };
   }, []);
@@ -170,6 +178,16 @@ export default function BusMap({
     L.circleMarker(toLatLng(userPosition), userStyle(colorsRef.current)).addTo(layer);
     fitTo(boundsOfPositions([userPosition]), MAP_DEFAULT_ZOOM);
   }, [userPosition]);
+
+  // Los autobuses se repintan enteros en cada actualización: son pocos y cambian de posición.
+  useEffect(() => {
+    const layer = vehicleLayerRef.current;
+    if (layer === null) {
+      return;
+    }
+    layer.clearLayers();
+    vehicles.forEach((vehicle) => createVehicleMarker(L, vehicle).addTo(layer));
+  }, [vehicles]);
 
   return <div ref={containerRef} className="absolute inset-0" role="region" aria-label="Mapa de postes" />;
 }

@@ -4,6 +4,7 @@ import type { BusStop, Coordinates } from '../lib/types';
 import { L } from './leaflet-with-clusters';
 import type { MapColors } from './map-colors';
 import { computeFitPadding, hasUsableSpace, type PanelCover } from './map-viewport';
+import { VEHICLE_PANE, VEHICLE_PANE_Z_INDEX } from './vehicle-layer';
 
 const ROUTE_PANE = 'zb-route';
 /** Por debajo del panel de vectores (400), donde están los postes, para que sigan siendo pulsables. */
@@ -31,6 +32,7 @@ export function createBaseMap(container: HTMLElement): Leaflet.Map {
   L.control.zoom({ position: 'topright' }).addTo(map);
   L.tileLayer(MAP_TILE_URL, { attribution: MAP_ATTRIBUTION, maxZoom: MAP_MAX_ZOOM }).addTo(map);
   map.createPane(ROUTE_PANE).style.zIndex = String(ROUTE_PANE_Z_INDEX);
+  map.createPane(VEHICLE_PANE).style.zIndex = String(VEHICLE_PANE_Z_INDEX);
   return map;
 }
 

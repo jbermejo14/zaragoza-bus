@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { arrivalsForLine, stopsForLine } from '../lib/line-filter';
+import type { BusVehicle } from '../lib/bus-vehicles';
+import { arrivalsForLine, stopsForLine, visibleVehicles } from '../lib/line-filter';
 import type { Arrival, BusStop } from '../lib/types';
 
 function makeStop(number: string, lines: string[]): BusStop {
@@ -43,4 +44,20 @@ test('arrivalsForLine deja las llegadas de la línea, en su orden', () => {
 test('arrivalsForLine no distingue mayúsculas y puede quedar vacío', () => {
   assert.equal(arrivalsForLine(ARRIVALS, 'CI1').length, 1);
   assert.deepEqual(arrivalsForLine(ARRIVALS, '35'), []);
+});
+
+function makeVehicle(line: string): BusVehicle {
+  return { vehicle: '4709', line, destination: 'Fuente Junquera', position: { latitude: 41.65, longitude: -0.88 }, arrivals: [] };
+}
+
+const VEHICLES: BusVehicle[] = [makeVehicle('58'), makeVehicle('Ci1'), makeVehicle('58')];
+
+test('visibleVehicles sin línea devuelve todos los autobuses', () => {
+  assert.deepEqual(visibleVehicles(VEHICLES, null), VEHICLES);
+});
+
+test('visibleVehicles deja solo los de la línea, sin distinguir mayúsculas ni prefijos', () => {
+  assert.equal(visibleVehicles(VEHICLES, '58').length, 2);
+  assert.deepEqual(visibleVehicles(VEHICLES, 'ci1').map((vehicle) => vehicle.line), ['Ci1']);
+  assert.deepEqual(visibleVehicles(VEHICLES, '5'), []);
 });

@@ -45,6 +45,9 @@
   --map-selected-color: #991b1b;
   --map-route-color: #dc2626;
   --map-user-color: #2563eb;
+  --map-bus-color: #1e293b;
+  --map-bus-text-color: #ffffff;
+  --map-bus-border-color: #ffffff;
   --radius-sm: 8px;
   --radius-md: 12px;
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -66,6 +69,9 @@
   --map-route-color: #f87171;
   --map-selected-color: #fca5a5;
   --map-user-color: #60a5fa;
+  --map-bus-color: #f1f5f9;
+  --map-bus-text-color: #0f172a;
+  --map-bus-border-color: #0f172a;
 }
 
 *,
@@ -450,6 +456,20 @@ body {
     background: var(--map-stop-color);
     color: #ffffff;
     font-size: 13px;
+    font-weight: 700;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.35);
+  }
+
+  /* Autobús con GPS: etiqueta redondeada con el número de línea, en los colores del tema. */
+  .zb-bus {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--map-bus-border-color);
+    border-radius: 6px;
+    background: var(--map-bus-color);
+    color: var(--map-bus-text-color);
+    font-size: 12px;
     font-weight: 700;
     box-shadow: 0 1px 4px rgba(15, 23, 42, 0.35);
   }

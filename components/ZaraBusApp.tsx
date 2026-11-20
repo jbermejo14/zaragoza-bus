@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useDeferredValue, useMemo, useRef, useState, type ReactNode } from 'react';
-import { stopsForLine } from '../lib/line-filter';
+import { stopsForLine, visibleVehicles } from '../lib/line-filter';
 import { findStopByNumber, listLines, searchStops } from '../lib/stop-search';
 import { pickRouteLine, toggleHighlightedLine } from '../lib/route-line';
 import type { BusStop } from '../lib/types';
@@ -9,6 +9,7 @@ import { useArrivals } from '../lib/use-arrivals';
 import { useFavorites } from '../lib/use-favorites';
 import { useGeolocation } from '../lib/use-geolocation';
 import { useLineRoute } from '../lib/use-line-route';
+import { useVehicles } from '../lib/use-vehicles';
 import { useStopHash } from '../lib/use-stop-hash';
 import { useStops } from '../lib/use-stops';
 import AppPanel from './AppPanel';
@@ -59,9 +60,11 @@ export default function ZaraBusApp({ panelFooter }: ZaraBusAppProps) {
     [stops, stopNumber],
   );
   const arrivals = useArrivals(selectedStop);
+  const allVehicles = useVehicles(selectedStop);
   // La línea resaltada pertenece al poste en que se pulsó: al cerrarlo o cambiar de poste deja de valer.
   const highlightedLine = highlight !== null && highlight.stopNumber === stopNumber ? highlight.line : null;
   const lineRoute = useLineRoute(pickRouteLine(line, highlightedLine));
+  const vehicles = useMemo(() => visibleVehicles(allVehicles, line), [allVehicles, line]);
   const lines = useMemo(() => listLines(stops), [stops]);
   const mapStops = useMemo(() => stopsForLine(stops, line), [stops, line]);
   const results = useMemo(() => searchStops(stops, deferredQuery, line), [stops, deferredQuery, line]);
@@ -127,6 +130,7 @@ export default function ZaraBusApp({ panelFooter }: ZaraBusAppProps) {
           route={lineRoute.route}
           routeSettled={!lineRoute.loading}
           panelRef={panelRef}
+          vehicles={vehicles}
           onSelectStop={selectStop}
         />
       </div>

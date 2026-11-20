@@ -351,7 +351,7 @@ Añade la posición real de los autobuses que se acercan al poste abierto. Se ha
 - `autobuses`: agrupados por coche (y línea+destino), con las llegadas ordenadas por minutos. Línea sin ceros a la izquierda si es numérica (`058` → `58`); si no, tal cual en mayúsculas. Destino con espacios normalizados.
 - Sin `maquinas` → `{ "poste": null, "autobuses": [] }` con 200.
 - Formato inesperado (no es objeto, `maquinas` no es objeto, una entrada de autobús sin coordenadas numéricas o con una fila que no tiene las 4 celdas esperadas) → 502. Mejor fallar que perder autobuses en silencio.
-- Petición al origen: POST con el cuerpo de arriba, `User-Agent: Ododex/1.0 (+https://ododex.com/es/zaragoza-bus)`, sin reenviar cabeceras del usuario, `redirect: "manual"`, tiempo máximo 5 s (como `/api/poste/`).
+- Petición al origen: POST con el cuerpo de arriba, `User-Agent: Ododex/1.0 (+https://ododex.com/es/zaragoza-bus)`, sin reenviar cabeceras del usuario, `redirect: "manual"`, tiempo máximo 7 s (el GPS de Avanza tarda de 3 a 6 s; queda por debajo de los 8 s del cliente).
 - Caché: los POST no los cachea `cf.cacheTtl`, así que se usa la Cache API (`caches.default`) con una clave GET sintética por poste y 15 s de vida, para que muchos usuarios mirando el mismo poste hagan una sola petición a Avanza. Si `caches` no existe (pruebas), se omite.
 - Cabeceras y errores como `/api/poste/` (400, 404, 405, 502; `no-store` en errores; `public, max-age=15` en 200; `x-robots-tag: noindex`).
 - La ruta nueva no añade exports: todo es privado. El módulo exporta `default` y, heredadas y ya desplegadas, las funciones `extraerFilasAvanza` y `mapearDndzgz` (workerd rechaza exports que no son funciones o manejadores, como las constantes).
@@ -374,6 +374,7 @@ export async function fetchStopVehicles(stopNumber: string, fetchFn: FetchFuncti
 ### Interfaz (pendiente del v2)
 
 - Con un poste abierto, se piden sus autobuses junto con los tiempos (mismo refresco de 30 s y misma pausa con la pestaña oculta) y se dibujan en el mapa: icono de bus con el número de línea, tooltip «Línea 58 → Fuente Junquera · coche 4709 · 21 min (4 km)». Con filtro de línea activo, solo los de esa línea.
+- Los autobuses van en un panel de Leaflet propio (`zb-vehicles`, zIndex 640): por encima de postes y grupos (600) y por debajo de los tooltips (650).
 - Se quitan del mapa al cerrar el poste. Si la petición falla, no se dibuja nada y no se muestra error (los tiempos siguen siendo la información principal).
 - Legales («Privacidad» y «Sobre este servicio»): las posiciones salen del sistema público de Avanza consultado por nuestro servidor, sin datos del usuario.
 

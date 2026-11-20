@@ -59,6 +59,9 @@ export default function PrivacidadPage() {
               Tiempos de paso: al abrir una parada, tu navegador pide los tiempos al servidor de Ododex (Cloudflare), que los consulta a su vez a Avanza Zaragoza o a DNDzgz enviando únicamente el número de poste. Esa consulta no incluye datos personales.
             </li>
             <li>
+              Posición de los autobuses: al abrir una parada, el servidor de Ododex (Cloudflare) consulta el sistema público de localización de Avanza Zaragoza enviando únicamente el número de poste. Esa consulta no incluye datos tuyos y las posiciones pueden tener retraso.
+            </li>
+            <li>
               Listado de paradas y recorridos: tu navegador los pide directamente a la API de datos abiertos del Ayuntamiento de Zaragoza, que recibe tu dirección IP como cualquier servidor web.
             </li>
             <li>

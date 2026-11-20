@@ -10,6 +10,9 @@ export default function AboutSection() {
         El listado de paradas procede de los datos abiertos del Ayuntamiento de Zaragoza. Los tiempos de paso se consultan a través del servidor de Ododex en la web pública de Avanza Zaragoza, con respaldo en DNDzgz y en la API municipal. Si ninguna fuente responde, la aplicación muestra datos simulados y lo indica con la etiqueta «Demo».
       </p>
       <p>
+        Las posiciones de los autobuses que se acercan a la parada salen del sistema público de localización de Avanza, consultado por el servidor de Ododex sin enviar ningún dato tuyo, y pueden tener retraso.
+      </p>
+      <p>
         Los tiempos son estimaciones del operador y pueden variar por el tráfico o por incidencias. Ododex es un sitio independiente: no es una web del Ayuntamiento de Zaragoza ni de Avanza.
       </p>
     </section>

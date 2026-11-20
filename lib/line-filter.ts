@@ -1,3 +1,4 @@
+import type { BusVehicle } from './bus-vehicles';
 import type { Arrival, BusStop } from './types';
 
 function lineFilterMatches(candidate: string, line: string): boolean {
@@ -21,4 +22,12 @@ export function arrivalsForLine(arrivals: readonly Arrival[], line: string | nul
     return arrivals;
   }
   return arrivals.filter((arrival) => lineFilterMatches(arrival.line, line));
+}
+
+/** Autobuses que dibuja el mapa con un filtro de línea: solo los de esa línea. Sin filtro devuelve todos. */
+export function visibleVehicles(vehicles: readonly BusVehicle[], line: string | null): readonly BusVehicle[] {
+  if (line === null) {
+    return vehicles;
+  }
+  return vehicles.filter((vehicle) => lineFilterMatches(vehicle.line, line));
 }
