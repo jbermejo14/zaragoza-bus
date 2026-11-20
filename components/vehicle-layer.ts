@@ -23,18 +23,28 @@ export function vehicleTooltipText(vehicle: BusVehicle): string {
   return parts.join(' · ');
 }
 
-/**
- * Marcador de un autobús: etiqueta con el número de línea (estilos `.zb-bus` en globals.css, que
- * cambian con el tema) y tooltip con sus datos. Recibe Leaflet como parámetro (y no importa
- * bus-map-layers) para que este módulo se pueda probar en Node, donde Leaflet no carga. El texto va como nodo de texto, no como HTML.
- */
 /** Panel propio de los autobuses: por encima de los postes y sus grupos (600) y por debajo de los tooltips (650). */
 export const VEHICLE_PANE = 'zb-vehicles';
 export const VEHICLE_PANE_Z_INDEX = 640;
 
+/** Nodo de texto plano: Leaflet trata las cadenas de un tooltip como HTML y estos datos vienen de un tercero. */
+function textElement(text: string): HTMLSpanElement {
+  const element = document.createElement('span');
+  element.textContent = text;
+  return element;
+}
+
+/**
+ * Marcador de un autobús: etiqueta con el número de línea (estilos `.zb-bus` en globals.css, que
+ * cambian con el tema) y tooltip con sus datos. Recibe Leaflet como parámetro (y no importa
+ * bus-map-layers) para que este módulo se pueda probar en Node, donde Leaflet no carga.
+ * Todo el texto va como nodos de texto, nunca como HTML.
+ */
 export function createVehicleMarker(leaflet: typeof Leaflet, vehicle: BusVehicle): Leaflet.Marker {
-  const label = document.createElement('span');
-  label.textContent = vehicle.line;
+  const description = vehicleTooltipText(vehicle);
+  const label = textElement(vehicle.line);
+  label.setAttribute('role', 'img');
+  label.setAttribute('aria-label', description);
   const icon = leaflet.divIcon({
     html: label,
     className: 'zb-bus',
@@ -46,6 +56,6 @@ export function createVehicleMarker(leaflet: typeof Leaflet, vehicle: BusVehicle
     keyboard: false,
     pane: VEHICLE_PANE,
   });
-  marker.bindTooltip(vehicleTooltipText(vehicle), { className: 'stop-tooltip' });
+  marker.bindTooltip(textElement(description), { className: 'stop-tooltip' });
   return marker;
 }

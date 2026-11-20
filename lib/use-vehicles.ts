@@ -41,13 +41,22 @@ export function useVehicles(stop: BusStop | null): BusVehicle[] {
         .then((result) => result.vehicles)
         .catch((error: unknown) => {
           console.warn('No se pudieron cargar las posiciones de los autobuses', error);
-          return NO_VEHICLES;
+          return null;
         })
         .then((vehicles) => {
           // Solo vale la última petición del poste actual: las anteriores llegan tarde.
-          if (!cancelled && requestId === requestCounter) {
-            setState({ stopId: stop.id, vehicles });
+          if (cancelled || requestId !== requestCounter) {
+            return;
           }
+          // Un fallo puntual (el GPS de Avanza a veces tarda demasiado) conserva las posiciones
+          // anteriores del mismo poste en vez de vaciar el mapa hasta el siguiente refresco.
+          setState((previous) =>
+            vehicles !== null
+              ? { stopId: stop.id, vehicles }
+              : previous.stopId === stop.id
+                ? previous
+                : { stopId: stop.id, vehicles: NO_VEHICLES },
+          );
         });
     };
 
