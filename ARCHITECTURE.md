@@ -378,8 +378,19 @@ export async function fetchStopVehicles(stopNumber: string, fetchFn: FetchFuncti
 - Se quitan del mapa al cerrar el poste. Si la petición falla, no se dibuja nada y no se muestra error (los tiempos siguen siendo la información principal).
 - Legales («Privacidad» y «Sobre este servicio»): las posiciones salen del sistema público de Avanza consultado por nuestro servidor, sin datos del usuario.
 
-### Criterios de aceptación
+### Criterios de aceptación (§4d)
 
 - Worker: pruebas con `fetch` simulado (cuerpo real de ejemplo con dos entradas del mismo coche, fila de línea no numérica, respuesta vacía `{"tablatiempos":""}`, formato roto → 502, poste inválido → 400, timeout, cabeceras, que la petición es POST con el cuerpo y User-Agent correctos y sin cabeceras del usuario, y uso de la caché cuando `caches` existe).
 - `lib/bus-vehicles.ts`: `parseStopVehicles` con casos válidos y cada error; `fetchStopVehicles` con fetch simulado (éxito, HTTP 502 con `{error}`, formato roto).
 - Comprobación manual contra el origen real con el Worker ejecutado en Node antes de desplegar.
+
+## 4e. Mapa v3 (2026-11-20): sin grupos con poste abierto, postes más visibles y autobuses a la vista
+
+Petición del titular: al pulsar una parada no deben verse paradas agrupadas; círculos de parada más grandes y visibles; ver los autobuses en el mapa. Diagnóstico: los autobuses GPS ya se dibujaban, pero al abrir un poste el mapa hacía zoom 17 sobre él y los autobuses (a 1–5 km) quedaban fuera de la vista.
+
+- **Sin grupos con poste abierto**: mientras hay un poste seleccionado, los postes visibles (todos o los de la línea filtrada) se pintan uno a uno, sin `markerClusterGroup`, en una capa normal con renderizador `L.canvas` (rendimiento con ~1000 círculos; tolerancia de toque de unos 8 px). Al cerrar el poste se vuelve a la capa agrupada. El cambio de capa no recrea el mapa ni pierde la vista.
+- **Postes más visibles** (con y sin grupos): radio 8 px (antes 6), borde 2,5 px del color de fondo del tema (blanco en claro, oscuro en oscuro) para que destaquen sobre el mapa; poste seleccionado radio 13 px con anillo y por encima del resto. Iconos de grupo un poco mayores y coherentes. Constantes con nombre y colores por variables CSS (como hoy).
+- **Autobuses a la vista**: al abrir un poste se centra en él como hoy; cuando llega la primera respuesta del GPS para ese poste, el mapa encuadra el poste y los autobuses más próximos (como mucho 3, por menor `arrivals[0].minutes`, respetando el filtro de línea) con `fitBounds`, el relleno del panel (`map-viewport`) y zoom máximo 17. Solo una vez por poste abierto: los refrescos posteriores no mueven la vista, para no pelear con el usuario. Sin autobuses, se queda en el poste.
+- **Icono de autobús más visible**: insignia con icono de bus y número de línea, más grande que hoy, con borde y sombra para que se distinga de los postes en ambos temas; tooltip como hoy.
+- Lógica pura nueva en `lib/vehicle-framing.ts`: `vehiclesToFrame(vehicles, line: string | null, limit): BusVehicle[]` y `framingPoints(stop, vehicles): Coordinates[]`, con pruebas.
+- Criterio: `npm test`, `npm run typecheck` y `npm run build` en verde; en el navegador, al abrir un poste se ven los postes cercanos sin grupos y los autobuses que llegan dentro de la vista, en claro y en oscuro, escritorio y 375 px.
