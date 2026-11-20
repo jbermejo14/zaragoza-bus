@@ -354,7 +354,7 @@ Añade la posición real de los autobuses que se acercan al poste abierto. Se ha
 - Petición al origen: POST con el cuerpo de arriba, `User-Agent: Ododex/1.0 (+https://ododex.com/es/zaragoza-bus)`, sin reenviar cabeceras del usuario, `redirect: "manual"`, tiempo máximo 5 s (como `/api/poste/`).
 - Caché: los POST no los cachea `cf.cacheTtl`, así que se usa la Cache API (`caches.default`) con una clave GET sintética por poste y 15 s de vida, para que muchos usuarios mirando el mismo poste hagan una sola petición a Avanza. Si `caches` no existe (pruebas), se omite.
 - Cabeceras y errores como `/api/poste/` (400, 404, 405, 502; `no-store` en errores; `public, max-age=15` en 200; `x-robots-tag: noindex`).
-- El módulo sigue exportando solo `default` (workerd rechaza otros exports).
+- La ruta nueva no añade exports: todo es privado. El módulo exporta `default` y, heredadas y ya desplegadas, las funciones `extraerFilasAvanza` y `mapearDndzgz` (workerd rechaza exports que no son funciones o manejadores, como las constantes).
 
 ### Cliente: `lib/bus-vehicles.ts` (types, config, bus-source)
 
