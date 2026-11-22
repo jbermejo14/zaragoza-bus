@@ -14,7 +14,7 @@ const SITE_DESCRIPTION =
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
   title: {
-    default: SITE_TITLE,
+    default: `${SITE_TITLE} | ${SITE_NAME}`,
     template: `%s | ${SITE_NAME}`,
   },
   description: SITE_DESCRIPTION,
@@ -25,8 +25,22 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'es_ES',
     siteName: SITE_NAME,
-    title: SITE_TITLE,
+    title: `${SITE_TITLE} | ${SITE_NAME}`,
     description: SITE_DESCRIPTION,
+    images: [
+      {
+        url: `${getSiteUrl()}/brand/ododex-og.png`,
+        width: 1200,
+        height: 630,
+        alt: `${SITE_TITLE} · ${SITE_NAME}`,
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: `${SITE_TITLE} | ${SITE_NAME}`,
+    description: SITE_DESCRIPTION,
+    images: [`${getSiteUrl()}/brand/ododex-og.png`],
   },
 };
 
