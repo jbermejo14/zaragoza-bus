@@ -3,6 +3,9 @@ import type { Coordinates, BusStop } from '../lib/types';
 import type { GeolocationStatus } from '../lib/use-geolocation';
 import FavoritesSection from './FavoritesSection';
 import NearbySection from './NearbySection';
+import StopResultList from './StopResultList';
+
+const PINNED_STOP_NUMBERS = ['3055', '3062'] as const;
 
 interface HomePanelProps {
   stops: readonly BusStop[];
@@ -22,6 +25,14 @@ export default function HomePanel({
   onRequestLocation,
   onSelect,
 }: HomePanelProps) {
+  const pinnedStops = useMemo(
+    () =>
+      PINNED_STOP_NUMBERS.map((number) => stops.find((stop) => stop.number === number)).filter(
+        (stop): stop is BusStop => stop !== undefined,
+      ),
+    [stops],
+  );
+
   const favoriteStops = useMemo(
     () =>
       favoriteIds
@@ -32,6 +43,11 @@ export default function HomePanel({
 
   return (
     <div className="flex flex-col gap-6">
+      {pinnedStops.length > 0 ? (
+        <section aria-label="Paradas fijadas">
+          <StopResultList items={pinnedStops.map((stop) => ({ stop }))} onSelect={onSelect} />
+        </section>
+      ) : null}
       <FavoritesSection favoriteStops={favoriteStops} onSelect={onSelect} />
       <NearbySection
         stops={stops}

@@ -21,7 +21,6 @@ import BusMapLoader from './BusMapLoader';
 import HomePanel from './HomePanel';
 import LineStatusPill from './LineStatusPill';
 import LineFilter from './LineFilter';
-import PanelHeader from './PanelHeader';
 import RouteNotice from './RouteNotice';
 import SearchBox from './SearchBox';
 import SearchResults from './SearchResults';
@@ -83,7 +82,7 @@ export default function ZaraBusApp({ panelFooter }: ZaraBusAppProps) {
     [stops, stopNumber],
   );
   const arrivals = useArrivals(selectedStop);
-  const allVehicles = useVehicles(selectedStop);
+  const { vehicles: allVehicles, refresh: refreshStopVehicles } = useVehicles(selectedStop);
   // La línea resaltada pertenece al poste en que se pulsó: al cerrarlo o cambiar de poste deja de valer.
   const highlightedLine = highlight !== null && highlight.stopNumber === stopNumber ? highlight.line : null;
   const lineRoute = useLineRoute(pickRouteLine(line, highlightedLine));
@@ -155,12 +154,10 @@ export default function ZaraBusApp({ panelFooter }: ZaraBusAppProps) {
   );
   const clearLineFilter = useCallback(() => changeLine(null), [changeLine]);
 
-  const headerSource = selectedStop === null ? stopsState : arrivals;
   const isSearching = query.trim() !== '' || line !== null;
 
   const top = (
     <>
-      <PanelHeader source={headerSource.source} fallbackReason={headerSource.fallbackReason} />
       <SearchBox value={query} onChange={changeQuery} onSubmit={submitSearch} />
       <LineFilter lines={lines} activeLine={line} onChange={changeLine} />
       <RouteNotice
@@ -187,7 +184,7 @@ export default function ZaraBusApp({ panelFooter }: ZaraBusAppProps) {
           onSelectStop={selectStop}
         />
       </div>
-<LineStatusPill        line={line}        vehicles={lineVehicles.vehicles === null ? 0 : lineVehicles.vehicles.length}        complete={lineVehicles.complete}        failed={lineVehicles.failed}        onClear={clearLineFilter}      />
+<LineStatusPill        line={line}        vehicles={lineVehicles.vehicles === null ? 0 : lineVehicles.vehicles.length}        complete={lineVehicles.complete}        failed={lineVehicles.failed}        onRefresh={lineVehicles.refresh}        onClear={clearLineFilter}      />
       <AppPanel top={top} revealKey={panelRevealKey(stopNumber, query)} collapseRequest={collapseRequest} panelRef={panelRef}>
         {selectedStop !== null ? (
           <StopBoard
@@ -204,7 +201,11 @@ export default function ZaraBusApp({ panelFooter }: ZaraBusAppProps) {
             isFavorite={favorites.isFavorite(selectedStop.id)}
             onBack={() => selectStopNumber(null)}
             onToggleFavorite={() => favorites.toggle(selectedStop.id)}
-            onRefresh={arrivals.refresh}
+            onRefresh={() => {
+              arrivals.refresh();
+              refreshStopVehicles();
+              if (line !== null) lineVehicles.refresh();
+            }}
           />
         ) : isSearching ? (
           <SearchResults

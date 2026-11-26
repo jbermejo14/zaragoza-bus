@@ -1,4 +1,4 @@
-import { Bus, LoaderCircle, X } from 'lucide-react';
+import { Bus, LoaderCircle, RefreshCw, X } from 'lucide-react';
 import { LINE_PILL_HEIGHT_PX, lineStatusText } from '../lib/line-selection';
 import LineBadge from './LineBadge';
 
@@ -11,6 +11,7 @@ interface LineStatusPillProps {
   complete: boolean;
   /** La primera ronda terminó sin respuesta de ninguna parada. */
   failed: boolean;
+  onRefresh?: () => void;
   onClear: () => void;
 }
 
@@ -27,7 +28,7 @@ function StatusIcon({ complete, failed }: { complete: boolean; failed: boolean }
  * quitarla. Arriba y centrada: en móvil bajo la barra de estado; en escritorio, en el área libre a la
  * derecha del panel.
  */
-export default function LineStatusPill({ line, vehicles, complete, failed, onClear }: LineStatusPillProps) {
+export default function LineStatusPill({ line, vehicles, complete, failed, onRefresh, onClear }: LineStatusPillProps) {
   if (line === null) {
     return null;
   }
@@ -44,6 +45,16 @@ export default function LineStatusPill({ line, vehicles, complete, failed, onCle
         <span aria-live="polite" className={`min-w-0 truncate ${textClasses}`}>
           {lineStatusText({ vehicles, complete, failed })}
         </span>
+        {onRefresh !== undefined ? (
+          <button
+            type="button"
+            aria-label={`Actualizar autobuses de la línea ${line}`}
+            onClick={onRefresh}
+            className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-card hover:text-accent-text"
+          >
+            <RefreshCw size={18} aria-hidden="true" className={!complete && !failed ? 'animate-spin' : ''} />
+          </button>
+        ) : null}
         <button
           type="button"
           aria-label={`Quitar la línea ${line}`}

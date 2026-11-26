@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { BusVehicle } from './bus-vehicles';
 import { AUTO_REFRESH_INTERVAL_MS } from './config';
 import { fetchLineVehicles, mergeVehicles, pickSampleStops, retainSeenVehicles } from './line-vehicles';
@@ -35,9 +35,11 @@ export interface LineVehiclesResult {
   complete: boolean;
   /** La primera ronda terminó sin que respondiera ninguna parada: los autobuses de la línea no están disponibles. */
   failed: boolean;
+  refresh: () => void;
 }
 
-const UNKNOWN_RESULT: LineVehiclesResult = { vehicles: null, complete: false, failed: false };
+const NOOP = () => {};
+const UNKNOWN_RESULT: LineVehiclesResult = { vehicles: null, complete: false, failed: false, refresh: NOOP };
 
 function addVehicles(previous: LineVehiclesState, line: string, incoming: BusVehicle[]): LineVehiclesState {
   const base = previous.line === line ? previous : { ...EMPTY_STATE, line };
@@ -60,6 +62,7 @@ function finishRound(previous: LineVehiclesState, line: string, seen: ReadonlySe
  */
 export function useLineVehicles(line: string | null, stops: readonly BusStop[]): LineVehiclesResult {
   const [state, setState] = useState<LineVehiclesState>(EMPTY_STATE);
+  const refreshRef = useRef<() => void>(NOOP);
   const sampleKey = useMemo(
     () => pickSampleStops(stops, LINE_SAMPLE_STOP_COUNT).map((stop) => stop.number).join(STOP_NUMBER_SEPARATOR),
     [stops],
@@ -119,6 +122,12 @@ export function useLineVehicles(line: string | null, stops: readonly BusStop[]):
       }
     };
 
+    refreshRef.current = () => {
+      setState((previous) =>
+        previous.line === line ? { ...previous, complete: false, failed: false } : previous,
+      );
+      void runRound();
+    };
     void runRound();
     const intervalId = setInterval(refreshIfVisible, AUTO_REFRESH_INTERVAL_MS);
     document.addEventListener('visibilitychange', handleVisibility);
@@ -129,8 +138,10 @@ export function useLineVehicles(line: string | null, stops: readonly BusStop[]):
     };
   }, [line, sampleKey]);
 
+  const refresh = useCallback(() => refreshRef.current(), []);
+
   if (line === null || state.line !== line) {
     return UNKNOWN_RESULT;
   }
-  return { vehicles: state.hasData ? state.vehicles : null, complete: state.complete, failed: state.failed };
+  return { vehicles: state.hasData ? state.vehicles : null, complete: state.complete, failed: state.failed, refresh };
 }

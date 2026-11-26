@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchStopVehicles } from './bus-vehicles';
 import type { BusVehicle } from './bus-vehicles';
 import { AUTO_REFRESH_INTERVAL_MS } from './config';
@@ -22,8 +22,14 @@ const EMPTY_STATE: VehiclesState = { stopId: null, vehicles: NO_VEHICLES };
  * `useArrivals`: al cambiar de poste y cada 30 s, en pausa con la pestaña oculta. Si la petición
  * falla no hay error visible (los tiempos son la información principal): lista vacía y aviso en consola.
  */
-export function useVehicles(stop: BusStop | null): BusVehicle[] {
+export interface VehiclesResult {
+  vehicles: BusVehicle[];
+  refresh: () => void;
+}
+
+export function useVehicles(stop: BusStop | null): VehiclesResult {
   const [state, setState] = useState<VehiclesState>(EMPTY_STATE);
+  const loadRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (stop === null) {
@@ -71,6 +77,7 @@ export function useVehicles(stop: BusStop | null): BusVehicle[] {
       }
     };
 
+    loadRef.current = load;
     load();
     const intervalId = setInterval(refreshIfVisible, AUTO_REFRESH_INTERVAL_MS);
     document.addEventListener('visibilitychange', handleVisibility);
@@ -81,5 +88,7 @@ export function useVehicles(stop: BusStop | null): BusVehicle[] {
     };
   }, [stop]);
 
-  return stop !== null && state.stopId === stop.id ? state.vehicles : NO_VEHICLES;
+  const refresh = useCallback(() => loadRef.current(), []);
+  const vehicles = stop !== null && state.stopId === stop.id ? state.vehicles : NO_VEHICLES;
+  return { vehicles, refresh };
 }
