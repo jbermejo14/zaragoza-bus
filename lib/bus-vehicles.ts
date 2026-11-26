@@ -1,4 +1,4 @@
-import { vehiclesProxyUrl } from './config';
+import { VEHICLES_TIMEOUT_MS, vehiclesProxyUrl } from './config';
 import { requestJson } from './bus-source';
 import type { FetchFunction } from './bus-source';
 import { FormatError } from './format-error';
@@ -108,5 +108,5 @@ export function parseStopVehicles(json: unknown): StopVehicles {
  * Lanza ante cualquier fallo, sin datos demo: si falla, el mapa no dibuja autobuses.
  */
 export async function fetchStopVehicles(stopNumber: string, fetchFn: FetchFunction): Promise<StopVehicles> {
-  return parseStopVehicles(await requestJson(fetchFn, vehiclesProxyUrl(stopNumber)));
+  return parseStopVehicles(await requestJson(fetchFn, vehiclesProxyUrl(stopNumber), VEHICLES_TIMEOUT_MS));
 }

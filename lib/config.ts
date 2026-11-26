@@ -48,7 +48,8 @@ export function lineRouteUrl(line: string): string {
 export const URBAN_STOP_ID_PREFIX = 'tuzsa-';
 
 export const REQUEST_TIMEOUT_MS = 8000;
-/** El GPS de Avanza tarda de 3 a 11 s por poste y el Worker consulta hasta 8 con cola de 4 a la vez. */
+export const VEHICLES_TIMEOUT_MS = 28_000;
+/** El GPS de Avanza tarda varios segundos por poste y el Worker consulta hasta 8 con cola de 4 a la vez. */
 export const LINE_VEHICLES_TIMEOUT_MS = 30_000;
 export const AUTO_REFRESH_INTERVAL_MS = 30_000;
 
