@@ -12,8 +12,10 @@ export function arrivalsUrl(stopId: string): string {
   return `${API_BASE}/${encodeURIComponent(stopId)}.json`;
 }
 
+const API_ORIGIN = (process.env.NEXT_PUBLIC_API_ORIGIN ?? '').replace(/\/+$/, '');
+
 /** Prefijo del proxy de tiempos del Worker de Ododex: debe coincidir con BASE_PATH de la sección y con el Worker ododex-zaragoza-bus. */
-export const ARRIVALS_PROXY_PREFIX = '/es/zaragoza-bus/api/poste/';
+export const ARRIVALS_PROXY_PREFIX = API_ORIGIN ? `${API_ORIGIN}/api/poste/` : '/es/zaragoza-bus/api/poste/';
 
 /** URL (relativa al sitio) de los tiempos de paso de un poste a través del proxy. */
 export function arrivalsProxyUrl(stopNumber: string): string {
@@ -21,7 +23,7 @@ export function arrivalsProxyUrl(stopNumber: string): string {
 }
 
 /** Prefijo del proxy de posiciones GPS del Worker de Ododex: debe coincidir con la ruta `/api/gps/` del Worker ododex-zaragoza-bus. */
-export const VEHICLES_PROXY_PREFIX = '/es/zaragoza-bus/api/gps/';
+export const VEHICLES_PROXY_PREFIX = API_ORIGIN ? `${API_ORIGIN}/api/gps/` : '/es/zaragoza-bus/api/gps/';
 
 /** URL (relativa al sitio) de los autobuses que se acercan a un poste, a través del proxy. */
 export function vehiclesProxyUrl(stopNumber: string): string {
@@ -29,7 +31,7 @@ export function vehiclesProxyUrl(stopNumber: string): string {
 }
 
 /** Prefijo del proxy de autobuses de una línea: debe coincidir con la ruta `/api/gps-linea/` del Worker ododex-zaragoza-bus. */
-export const LINE_VEHICLES_PROXY_PREFIX = '/es/zaragoza-bus/api/gps-linea/';
+export const LINE_VEHICLES_PROXY_PREFIX = API_ORIGIN ? `${API_ORIGIN}/api/gps-linea/` : '/es/zaragoza-bus/api/gps-linea/';
 
 /** URL (relativa al sitio) de todos los autobuses de una línea, consultando los postes dados (separados por comas). */
 export function lineVehiclesProxyUrl(line: string, stopNumbers: readonly string[]): string {

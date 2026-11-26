@@ -33,6 +33,7 @@ jobs:
         env:
           NEXT_PUBLIC_BASE_PATH: /zaragoza-bus
           NEXT_PUBLIC_SITE_URL: https://jbermejo14.github.io
+          NEXT_PUBLIC_API_ORIGIN: https://zaragoza-bus-api.jpbermejobramley.workers.dev
         run: npm run build
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
