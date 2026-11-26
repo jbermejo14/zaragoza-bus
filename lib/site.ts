@@ -4,8 +4,8 @@ export const SITE_NAME = 'Ododex';
 /** Etiqueta de la sección que aparece junto al logo en la cabecera. */
 export const SECTION_NAME = 'Autobús de Zaragoza';
 
-/** Ruta bajo la que se publica la web dentro de ododex.com. Sin barra final. */
-export const BASE_PATH = '/es/zaragoza-bus';
+/** Ruta bajo la que se publica la web (en ododex.com o en GitHub Pages). Sin barra final. */
+export const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? '/es/zaragoza-bus';
 
 const DEFAULT_SITE_URL = 'http://localhost:3000';
 
