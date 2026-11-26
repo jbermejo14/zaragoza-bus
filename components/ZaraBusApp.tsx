@@ -63,7 +63,7 @@ function vehiclesToDraw(
 }
 
 /** Estado raíz: consulta, línea, poste seleccionado (en el hash); compone el mapa a pantalla completa y el panel. */
-export default function ZaraBusApp({ panelFooter }: ZaraBusAppProps) {
+export default function ZaraBusApp({ panelFooter: _panelFooter }: ZaraBusAppProps) {
   const [query, setQuery] = useState('');
   const [line, setLine] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<HighlightState | null>(null);
@@ -225,7 +225,6 @@ export default function ZaraBusApp({ panelFooter }: ZaraBusAppProps) {
             onSelect={selectStop}
           />
         )}
-        {panelFooter}
       </AppPanel>
     </div>
   );
