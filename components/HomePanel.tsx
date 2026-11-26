@@ -5,7 +5,7 @@ import FavoritesSection from './FavoritesSection';
 import NearbySection from './NearbySection';
 import StopResultList from './StopResultList';
 
-const PINNED_STOP_NUMBERS = ['3055', '3062'] as const;
+const PINNED_STOP_NUMBERS = ['3055', '3062', '864'] as const;
 
 interface HomePanelProps {
   stops: readonly BusStop[];
